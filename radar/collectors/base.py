@@ -78,8 +78,11 @@ def parece_bloqueo(html: str, url_final: str = "") -> bool:
 class Navegador:
     """Context manager sobre Playwright. Un solo navegador, ritmo bajo, sin técnicas de evasión."""
 
-    def __init__(self, perfil: str | None = None, headless: bool = True, pausa: bool = True):
-        self.perfil, self.headless, self.pausa = perfil, headless, pausa
+    def __init__(self, perfil: str | None = None, headless: bool = False, pausa: bool = True,
+                 canal: str | None = "chrome"):
+        # Por defecto abre una ventana visible de tu Chrome instalado: es un navegador normal, sin disfraz.
+        # El modo oculto (headless) lo rechazan eBay y Reverb en la primera página (comprobado el 15 nov 2026).
+        self.perfil, self.headless, self.pausa, self.canal = perfil, headless, pausa, canal
         self._pw = self._ctx = self._page = None
         self._ultimo: dict[str, float] = {}  # host -> momento de la última petición
 
@@ -87,11 +90,19 @@ class Navegador:
         from playwright.sync_api import sync_playwright
 
         self._pw = sync_playwright().start()
-        if self.perfil:
-            self._ctx = self._pw.chromium.launch_persistent_context(self.perfil, headless=self.headless)
-        else:
-            nav = self._pw.chromium.launch(headless=self.headless)
-            self._ctx = nav.new_context(locale="en-US")
+        for canal in ([self.canal, None] if self.canal else [None]):  # si no hay Chrome, usa Chromium
+            try:
+                extra = {"channel": canal} if canal else {}
+                if self.perfil:
+                    self._ctx = self._pw.chromium.launch_persistent_context(self.perfil, headless=self.headless, **extra)
+                else:
+                    nav = self._pw.chromium.launch(headless=self.headless, **extra)
+                    self._ctx = nav.new_context(locale="en-US")
+                break
+            except Exception:
+                if canal is None:
+                    self._pw.stop()
+                    raise
         self._page = self._ctx.pages[0] if self._ctx.pages else self._ctx.new_page()
         return self
 
@@ -117,8 +128,13 @@ class Navegador:
         resp = self._page.goto(url, wait_until="domcontentloaded", timeout=45000)
         self._page.wait_for_timeout(2500)
         html = self._page.content()
-        if (resp is not None and resp.status in (403, 429)) or parece_bloqueo(html, self._page.url):
-            raise LectorBloqueado(f"{url} → bloqueo o inicio de sesión requerido")
+        estado = resp.status if resp is not None else 0
+        if estado in (403, 429) or parece_bloqueo(html, self._page.url):
+            try:
+                titulo = self._page.title()[:80]
+            except Exception:
+                titulo = ""
+            raise LectorBloqueado(f"{url} → HTTP {estado}, título «{titulo}», quedó en {self._page.url[:90]}")
         return html
 
     def json(self, origen: str, ruta: str, cabeceras: dict | None = None):

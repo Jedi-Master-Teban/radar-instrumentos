@@ -20,9 +20,9 @@ PLANTILLAS.env.filters.update(cop=cop, usd=usd, pct=lambda x: "—" if x is None
 NUMERICOS = ["margen_objetivo", "arancel", "iva", "sales_tax_us", "margen_cambiario", "descuento_negociacion_co",
              "descuento_negociacion_us", "factor_usado_sobre_nuevo_co", "comision_canal", "min_refs_co",
              "min_comparables_us", "cache_co_dias", "cache_us_dias", "max_alertas_dia", "max_normalizar_dia",
-             "ciudades_fb_por_dia",
+             "ciudades_fb_por_dia", "navegador_visible",
              "precio_nuevo_min_usd", "precio_nuevo_max_usd", "ganga_descuento_min", "sospecha_bajo"]
-ENTEROS = {"ciudades_fb_por_dia", "min_refs_co", "min_comparables_us", "cache_co_dias", "cache_us_dias", "max_alertas_dia",
+ENTEROS = {"ciudades_fb_por_dia", "navegador_visible", "min_refs_co", "min_comparables_us", "cache_co_dias", "cache_us_dias", "max_alertas_dia",
            "max_normalizar_dia"}
 
 
@@ -41,6 +41,14 @@ def _lanzar_corrida(aj: config.Ajustes, prueba: bool) -> int:
 def _vivo(pid: int) -> bool:
     import os
 
+    try:
+        terminado, _ = os.waitpid(pid, os.WNOHANG)  # recoge el proceso si ya terminó (evita "zombis")
+        if terminado == pid:
+            return False
+    except ChildProcessError:
+        pass  # no es hijo de este proceso (p. ej. tras recargar el tablero)
+    except OSError:
+        return False
     try:
         os.kill(pid, 0)
         return True
@@ -237,3 +245,8 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo) -> FastAPI
         return PLANTILLAS.TemplateResponse(request, "eventos.html", {"eventos": filas})
 
     return app
+
+
+def app_desde_entorno() -> FastAPI:
+    """Fábrica para uvicorn con recarga automática."""
+    return crear_app(config.cargar())

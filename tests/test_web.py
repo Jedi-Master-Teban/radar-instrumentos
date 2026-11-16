@@ -124,3 +124,14 @@ def test_corrida_desde_el_tablero(tmp_path, monkeypatch):
     vivos.clear()
     assert "Corrida completa" in c.get("/corrida").text
     assert c.post("/corrida", data={"modo": "otra"}).status_code == 422
+
+
+def test_proceso_terminado_no_cuenta_como_corrida_activa():
+    import subprocess
+    import sys
+    import time
+
+    from radar.web.app import _vivo
+    proc = subprocess.Popen([sys.executable, "-c", "pass"])
+    time.sleep(0.5)  # ya terminó, pero nadie lo ha recogido: antes se veía como "en curso"
+    assert _vivo(proc.pid) is False

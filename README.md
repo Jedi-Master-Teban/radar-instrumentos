@@ -11,7 +11,7 @@ cd ~/Código/radar-instrumentos
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 playwright install chromium
-pytest -q                      # 94 pruebas, sin red
+pytest -q                      # 95 pruebas, sin red
 python -m radar web            # tablero en http://127.0.0.1:8000
 ```
 
@@ -69,6 +69,12 @@ Todos los porcentajes y topes se editan en **Parámetros**.
 La navegación real con Playwright (`radar/collectors/base.py`) **no se ha ejecutado todavía**: las pruebas usan
 muestras guardadas. La primera corrida real es la verificación pendiente; si un lector devuelve cero
 resultados, recibes el aviso `lector_sin_resultados` y hay que ajustar sus selectores.
+
+## Ventana del navegador
+
+La corrida abre una ventana visible de tu Chrome (parámetro `navegador_visible = 1`). En modo oculto, eBay y
+Reverb rechazaron la primera página el 15 nov 2026. Es un navegador normal: no se altera su identificación ni se
+usan proxies. Si aun así un sitio pide verificación, el lector se detiene y lo registra en Eventos.
 
 ## Ciudades de Facebook
 

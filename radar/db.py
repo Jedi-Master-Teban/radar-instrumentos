@@ -34,6 +34,7 @@ PARAMETROS_DEFECTO: dict = {
                     "houston", "dallas", "austin", "atlanta", "nashville", "philly", "boston", "dc", "seattle",
                     "sanfrancisco", "sandiego", "phoenix", "denver", "vegas", "detroit", "charlotte"],
     "ciudades_fb_por_dia": 4,
+    "navegador_visible": 1,  # 1 = ventana visible de Chrome; 0 = oculto (eBay y Reverb lo rechazan)
     "tiendas_co": [
         {"nombre": "Ortizo", "origen": "https://ortizo.com.co", "plataforma": "shopify"},
         {"nombre": "La Colonial", "origen": "https://www.lacolonial.com.co", "plataforma": "shopify"},

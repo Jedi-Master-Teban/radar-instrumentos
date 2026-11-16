@@ -34,9 +34,10 @@ def correr(prueba: bool = False) -> int:
     log(f"TRM {trm:,.2f} · modelo {aj.nim_model or 'por defecto'} · {'PRUEBA (1 búsqueda, 12 por sitio)' if prueba else 'corrida completa'}")
     modelo = Modelo(modelo=aj.nim_model, api_key=aj.nim_api_key)
     avisos = _notificador(aj, con)
-    with Navegador() as nav:
+    oculto = not db.parametros(con).get("navegador_visible", 1)
+    with Navegador(headless=oculto) as nav:
         if hay_perfil(aj):
-            with Navegador(perfil=aj.perfil_fb) as nav_sesion:
+            with Navegador(perfil=aj.perfil_fb, headless=oculto) as nav_sesion:
                 resumen = tuberia(con, *armar(con, aj, nav, nav_sesion, trm), modelo, avisos, trm, date.today(),
                                   log=log, **limites)
         else:
@@ -50,10 +51,9 @@ def correr(prueba: bool = False) -> int:
 def web() -> int:
     import uvicorn
 
-    from .web.app import crear_app
-
-    aj = config.cargar()
-    uvicorn.run(crear_app(aj), host="127.0.0.1", port=8000)
+    # reload=True: el tablero toma los cambios de código sin reiniciarlo a mano
+    uvicorn.run("radar.web.app:app_desde_entorno", factory=True, host="127.0.0.1", port=8000, reload=True,
+                reload_dirs=["radar"])
     return 0
 
 
