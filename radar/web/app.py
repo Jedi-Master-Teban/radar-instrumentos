@@ -20,13 +20,58 @@ PLANTILLAS.env.filters.update(cop=cop, usd=usd, pct=lambda x: "—" if x is None
 NUMERICOS = ["margen_objetivo", "arancel", "iva", "sales_tax_us", "margen_cambiario", "descuento_negociacion_co",
              "descuento_negociacion_us", "factor_usado_sobre_nuevo_co", "comision_canal", "min_refs_co",
              "min_comparables_us", "cache_co_dias", "cache_us_dias", "max_alertas_dia", "max_normalizar_dia",
+             "ciudades_fb_por_dia",
              "precio_nuevo_min_usd", "precio_nuevo_max_usd", "ganga_descuento_min", "sospecha_bajo"]
-ENTEROS = {"min_refs_co", "min_comparables_us", "cache_co_dias", "cache_us_dias", "max_alertas_dia",
+ENTEROS = {"ciudades_fb_por_dia", "min_refs_co", "min_comparables_us", "cache_co_dias", "cache_us_dias", "max_alertas_dia",
            "max_normalizar_dia"}
 
 
-def crear_app(aj: config.Ajustes) -> FastAPI:
+def _lanzar_corrida(aj: config.Ajustes, prueba: bool) -> int:
+    """Arranca `python -m radar correr` en segundo plano; la salida va a ~/.radar/corrida.log."""
+    import subprocess
+    import sys
+
+    raiz = Path(__file__).resolve().parents[2]
+    args = [sys.executable, "-u", "-m", "radar", "correr"] + (["--prueba"] if prueba else [])
+    with open(aj.home / "corrida.log", "w") as salida:
+        proc = subprocess.Popen(args, cwd=raiz, stdout=salida, stderr=subprocess.STDOUT, start_new_session=True)
+    return proc.pid
+
+
+def _vivo(pid: int) -> bool:
+    import os
+
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo) -> FastAPI:
     app = FastAPI(title="Radar de instrumentos", docs_url=None, redoc_url=None)
+
+    def corrida_activa() -> bool:
+        ruta = aj.home / "corrida.pid"
+        try:
+            return vivo(int(ruta.read_text()))
+        except (OSError, ValueError):
+            return False
+
+    @app.get("/corrida", response_class=HTMLResponse)
+    def ver_corrida(request: Request):
+        ruta = aj.home / "corrida.log"
+        registro = "\n".join(ruta.read_text(errors="replace").splitlines()[-120:]) if ruta.exists() else ""
+        return PLANTILLAS.TemplateResponse(request, "corrida.html", {
+            "activa": corrida_activa(), "registro": registro, "nim": bool(config.cargar(None).nim_api_key)})
+
+    @app.post("/corrida")
+    def iniciar_corrida(modo: str = Form("prueba")):
+        if modo not in ("prueba", "completa"):
+            raise HTTPException(422, "Modo no válido")
+        if not corrida_activa():
+            (aj.home / "corrida.pid").write_text(str(lanzar(aj, modo == "prueba")))
+        return RedirectResponse("/corrida", status_code=303)
 
     @app.middleware("http")
     async def solo_formularios_propios(request: Request, call_next):
@@ -66,7 +111,8 @@ def crear_app(aj: config.Ajustes) -> FastAPI:
         marcas = sorted({json.loads(r[0])["normalizado"]["marca"] for r in c.execute("select datos from oportunidades")})
         return PLANTILLAS.TemplateResponse(request, "lista.html", {
             "ops": ops, "marcas": marcas, "f": dict(plataforma=plataforma, marca=marca, tipo=tipo, estado=estado),
-            "estados": ESTADOS_OPORTUNIDAD})
+            "estados": ESTADOS_OPORTUNIDAD,
+            "corridas": c.execute("select count(*) from eventos where tipo='corrida'").fetchone()[0]})
 
     @app.get("/oportunidad/{oid}", response_class=HTMLResponse)
     def detalle(request: Request, oid: int):

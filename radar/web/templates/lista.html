@@ -6,7 +6,8 @@
 <div><label>Plataforma</label><select name="plataforma"><option value="">Todas</option>{% for x in ['ebay','reverb','facebook'] %}<option {{ 'selected' if f.plataforma==x }}>{{ x }}</option>{% endfor %}</select></div>
 <div><label>Marca</label><select name="marca"><option value="">Todas</option>{% for m in marcas %}<option {{ 'selected' if f.marca==m }}>{{ m }}</option>{% endfor %}</select></div>
 <button>Filtrar</button></form>
-{% if not ops %}<p class="suave">No hay oportunidades con estos filtros. La corrida diaria las irá agregando.</p>{% else %}
+{% if not ops %}{% if corridas == 0 %}<p>Todavía no se ha hecho ninguna corrida: guardar la clave no busca nada por sí solo. <a href="/corrida">Lanza una corrida de prueba</a>.</p>
+{% else %}<p class="suave">No hay oportunidades con estos filtros. Revisa <a href="/corrida">la última corrida</a> y <a href="/eventos">los eventos</a>.</p>{% endif %}{% else %}
 <div class="envoltura"><table><tr><th>Artículo</th><th>Tipo</th><th class="n">Pedido</th><th class="n">Apertura</th><th class="n">Techo</th>
 <th class="n">EE. UU. usado</th><th class="n">Colombia</th><th class="n">Margen</th><th class="n">Puntaje</th></tr>
 {% for o in ops %}<tr>

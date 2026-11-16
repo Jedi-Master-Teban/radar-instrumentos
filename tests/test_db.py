@@ -33,3 +33,16 @@ def test_watchlist_semilla_incluye_las_ocho_marcas(con):
     marcas = {r[0] for r in con.execute("select marca from watchlist where categoria='guitarra'")}
     assert marcas == {"Gibson", "Fender", "Jackson", "PRS", "Strandberg", "Schecter",
                       "Ernie Ball Music Man", "Epiphone"}
+
+
+def test_migracion_amplia_ciudades_solo_si_no_se_cambiaron(tmp_path):
+    from radar import db
+    ruta = str(tmp_path / "r.db")
+    c = db.conectar(ruta)
+    db.set_parametro(c, "ciudades_fb", ["miami", "nyc"])
+    c.close()
+    assert len(db.parametros(db.conectar(ruta))["ciudades_fb"]) == 24
+    c = db.conectar(ruta)
+    db.set_parametro(c, "ciudades_fb", ["tampa"])
+    c.close()
+    assert db.parametros(db.conectar(ruta))["ciudades_fb"] == ["tampa"]

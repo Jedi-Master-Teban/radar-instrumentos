@@ -1,6 +1,7 @@
 """Conecta los lectores reales con la tubería."""
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 from . import db
@@ -13,7 +14,16 @@ def hay_perfil(aj: Ajustes) -> bool:
     return Path(aj.perfil_fb).exists() and any(Path(aj.perfil_fb).iterdir())
 
 
-def armar(con, aj: Ajustes, nav: Navegador, nav_sesion: Navegador | None, trm: float):
+def ciudades_de_hoy(ciudades: list[str], por_dia: int, hoy: date) -> list[str]:
+    """Rota la lista: cada día toma el siguiente bloque, para cubrir todas sin cargar la cuenta."""
+    if not ciudades:
+        return []
+    por_dia = max(1, min(int(por_dia), len(ciudades)))
+    inicio = (hoy.toordinal() * por_dia) % len(ciudades)
+    return [ciudades[(inicio + i) % len(ciudades)] for i in range(por_dia)]
+
+
+def armar(con, aj: Ajustes, nav: Navegador, nav_sesion: Navegador | None, trm: float, hoy: date | None = None):
     """Devuelve (lectores, fuentes_us, fuentes_co). nav_sesion = navegador con el perfil que inició sesión."""
     p = db.parametros(con)
     lectores = {
@@ -28,7 +38,7 @@ def armar(con, aj: Ajustes, nav: Navegador, nav_sesion: Navegador | None, trm: f
     if nav_sesion is not None:
         def fb(c):
             vistos = {}
-            for ciudad in p["ciudades_fb"]:
+            for ciudad in ciudades_de_hoy(p["ciudades_fb"], p["ciudades_fb_por_dia"], hoy or date.today()):
                 for l in facebook.buscar_us(nav_sesion, c, ciudad):
                     vistos.setdefault(l.id_externo, l)
             return list(vistos.values())

@@ -29,7 +29,11 @@ PARAMETROS_DEFECTO: dict = {
     "min_comparables_us": 3,
     "max_normalizar_dia": 200,
     "trm_manual": None,
-    "ciudades_fb": ["miami", "nyc"],
+    # Florida primero; luego otros estados. Cada día se leen solo "ciudades_fb_por_dia", rotando.
+    "ciudades_fb": ["miami", "orlando", "tampa", "jacksonville", "fortlauderdale", "nyc", "la", "chicago",
+                    "houston", "dallas", "austin", "atlanta", "nashville", "philly", "boston", "dc", "seattle",
+                    "sanfrancisco", "sandiego", "phoenix", "denver", "vegas", "detroit", "charlotte"],
+    "ciudades_fb_por_dia": 4,
     "tiendas_co": [
         {"nombre": "Ortizo", "origen": "https://ortizo.com.co", "plataforma": "shopify"},
         {"nombre": "La Colonial", "origen": "https://www.lacolonial.com.co", "plataforma": "shopify"},
@@ -101,6 +105,11 @@ def conectar(ruta: str) -> sqlite3.Connection:
     con.executescript(ESQUEMA)
     for clave, valor in PARAMETROS_DEFECTO.items():
         con.execute("insert or ignore into parametros(clave, valor) values(?, ?)", (clave, json.dumps(valor)))
+    # Migración: la primera versión traía solo dos ciudades; se amplía si el usuario no las cambió.
+    fila = con.execute("select valor from parametros where clave='ciudades_fb'").fetchone()
+    if fila and json.loads(fila["valor"]) == ["miami", "nyc"]:
+        con.execute("update parametros set valor=? where clave='ciudades_fb'",
+                    (json.dumps(PARAMETROS_DEFECTO["ciudades_fb"]),))
     if con.execute("select count(*) from watchlist").fetchone()[0] == 0:
         con.executemany("insert into watchlist(categoria, marca, consulta) values(?, ?, ?)", WATCHLIST_SEMILLA)
     con.commit()

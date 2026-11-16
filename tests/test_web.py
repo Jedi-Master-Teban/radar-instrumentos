@@ -101,3 +101,26 @@ def test_formulario_desde_otro_sitio_se_rechaza(cliente):
     c, aj = cliente
     r = c.post("/ajustes", data={"nim_api_key": "robada"}, headers={"Origin": "https://sitio-malicioso.example"})
     assert r.status_code == 403 and not (aj.home / ".env").exists()
+
+
+def test_corrida_desde_el_tablero(tmp_path, monkeypatch):
+    monkeypatch.setenv("RADAR_HOME", str(tmp_path))
+    aj = config.cargar(None)
+    lanzadas, vivos = [], set()
+
+    def lanzar(a, prueba):
+        lanzadas.append(prueba)
+        vivos.add(4242)
+        (a.home / "corrida.log").write_text("ebay: 12 publicaciones\n")
+        return 4242
+    c = TestClient(crear_app(aj, lanzar=lanzar, vivo=lambda pid: pid in vivos))
+    assert "ninguna corrida" in c.get("/").text  # lista vacía explica qué hacer
+    assert "Aún no hay registro" in c.get("/corrida").text
+    assert c.post("/corrida", data={"modo": "prueba"}, follow_redirects=False).status_code == 303
+    t = c.get("/corrida").text
+    assert "corrida en curso" in t and "ebay: 12 publicaciones" in t
+    c.post("/corrida", data={"modo": "completa"})  # ya hay una: no lanza otra
+    assert lanzadas == [True]
+    vivos.clear()
+    assert "Corrida completa" in c.get("/corrida").text
+    assert c.post("/corrida", data={"modo": "otra"}).status_code == 422

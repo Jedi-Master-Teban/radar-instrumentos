@@ -81,7 +81,7 @@ class Navegador:
     def __init__(self, perfil: str | None = None, headless: bool = True, pausa: bool = True):
         self.perfil, self.headless, self.pausa = perfil, headless, pausa
         self._pw = self._ctx = self._page = None
-        self._primera = True
+        self._ultimo: dict[str, float] = {}  # host -> momento de la última petición
 
     def __enter__(self):
         from playwright.sync_api import sync_playwright
@@ -101,13 +101,19 @@ class Navegador:
         finally:
             self._pw.stop()
 
-    def _esperar(self):
-        if self.pausa and not self._primera:
-            time.sleep(random.uniform(PAUSA_MIN, PAUSA_MAX))
-        self._primera = False
+    def _esperar(self, url: str):
+        """Pausa de 5–10 s entre peticiones AL MISMO sitio. Sitios distintos no se esperan entre sí."""
+        from urllib.parse import urlparse
+
+        host = urlparse(url).hostname or ""
+        if self.pausa and host in self._ultimo:
+            falta = self._ultimo[host] + random.uniform(PAUSA_MIN, PAUSA_MAX) - time.monotonic()
+            if falta > 0:
+                time.sleep(falta)
+        self._ultimo[host] = time.monotonic()
 
     def html(self, url: str) -> str:
-        self._esperar()
+        self._esperar(url)
         resp = self._page.goto(url, wait_until="domcontentloaded", timeout=45000)
         self._page.wait_for_timeout(2500)
         html = self._page.content()
@@ -119,8 +125,7 @@ class Navegador:
         """Pide un JSON del mismo sitio desde la página (como lo hace el propio sitio)."""
         if not self._page.url.startswith(origen):
             self.html(origen)
-        else:
-            self._esperar()
+        self._esperar(origen)
         res = self._page.evaluate(
             """async ([ruta, cab]) => { const r = await fetch(ruta, {headers: cab});
                  return {status: r.status, texto: r.ok ? await r.text() : ''}; }""",

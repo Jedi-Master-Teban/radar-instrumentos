@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block cuerpo %}
+{% if activa %}<meta http-equiv="refresh" content="6">{% endif %}
+<h1>Correr el radar</h1>
+{% if not nim %}<p class="aviso">Falta la clave de NVIDIA NIM: guárdala en <a href="/ajustes">Ajustes</a> antes de correr.</p>{% endif %}
+{% if activa %}<p><b>Hay una corrida en curso.</b> Esta página se actualiza sola.</p>
+{% else %}<form class="fila" method="post" action="/corrida">
+<button name="modo" value="prueba">Corrida de prueba</button><span class="suave">1 búsqueda, 12 publicaciones por sitio; unos minutos.</span></form>
+<form class="fila" method="post" action="/corrida">
+<button name="modo" value="completa">Corrida completa</button><span class="suave">Toda la lista de seguimiento; puede tardar más de una hora.</span></form>{% endif %}
+<h2>Registro de la última corrida</h2>
+{% if registro %}<pre>{{ registro }}</pre>{% else %}<p class="suave">Aún no hay registro.</p>{% endif %}
+{% endblock %}

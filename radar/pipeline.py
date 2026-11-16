@@ -21,11 +21,13 @@ def _marcar(con, lid: int, proceso: str) -> None:
     con.commit()
 
 
-def _recolectar(con, lectores: dict, p: dict, hoy: date, notificador) -> tuple[list[tuple[int, Listing, str]], int, int]:
+def _recolectar(con, lectores: dict, p: dict, hoy: date, notificador, max_consultas: int | None = None,
+                max_por_lector: int | None = None, log=lambda m: None) -> tuple[list[tuple[int, Listing, str]], int, int]:
     pendientes, total, errores = [], 0, 0
     conteo = {n: 0 for n in lectores}
     bloqueados: set[str] = set()
-    for w in con.execute("select categoria, consulta from watchlist where activo=1").fetchall():
+    consultas = con.execute("select categoria, consulta from watchlist where activo=1 order by id").fetchall()
+    for w in consultas[:max_consultas]:
         for nombre, lector in lectores.items():
             if nombre in bloqueados:
                 continue
@@ -42,7 +44,8 @@ def _recolectar(con, lectores: dict, p: dict, hoy: date, notificador) -> tuple[l
                 db.evento(con, "lector_error", f"{nombre} ({w['consulta']}): {type(e).__name__}: {e}")
                 continue
             conteo[nombre] += len(lote)
-            for l in lote:
+            log(f"{nombre}: {len(lote)} publicaciones para '{w['consulta']}'")
+            for l in lote[:max_por_lector]:
                 maximo = p["precio_nuevo_max_usd"] if w["categoria"] in ("guitarra", "bajo") else 10_000
                 if not l.hace_envios or not (PRECIO_MIN_PREFILTRO[w["categoria"]] <= l.precio_usd <= maximo):
                     continue
@@ -145,12 +148,14 @@ def _alertar(con, modelo, notificador, p: dict) -> int:
 
 
 def correr(con, lectores: dict, fuentes_us: dict, fuentes_co: dict, modelo, notificador, trm: float,
-           hoy: date) -> dict:
-    """lectores: nombre -> callable(consulta) -> list[Listing]."""
+           hoy: date, max_consultas: int | None = None, max_por_lector: int | None = None,
+           log=lambda m: None) -> dict:
+    """lectores: nombre -> callable(consulta) -> list[Listing]. max_* limitan una corrida de prueba."""
     p = db.parametros(con)
-    pendientes, total, errores = _recolectar(con, lectores, p, hoy, notificador)
+    pendientes, total, errores = _recolectar(con, lectores, p, hoy, notificador, max_consultas, max_por_lector, log)
+    log(f"{total} publicaciones dentro de rango; {len(pendientes)} nuevas o rebajadas por evaluar")
     estados: dict[str, int] = {}
-    for lid, l, _cat in pendientes[: int(p["max_normalizar_dia"])]:
+    for i, (lid, l, _cat) in enumerate(pendientes[: int(p["max_normalizar_dia"])], 1):
         try:
             r = _evaluar(con, lid, l, modelo, fuentes_us, fuentes_co, trm, p, hoy)
         except Exception as e:
@@ -159,6 +164,7 @@ def correr(con, lectores: dict, fuentes_us: dict, fuentes_co: dict, modelo, noti
             db.evento(con, "error_evaluacion", f"{l.plataforma}:{l.id_externo}: {type(e).__name__}: {e}")
         _marcar(con, lid, r)
         estados[r] = estados.get(r, 0) + 1
+        log(f"[{i}/{len(pendientes)}] {r}: {l.plataforma} {l.precio_usd:.0f} USD — {l.titulo[:70]}")
     alertas = _alertar(con, modelo, notificador, p)
     resumen = {"listings": total, "nuevos_o_rebajados": len(pendientes), "oportunidades": estados.get("oportunidad", 0),
                "alertas": alertas, "errores": errores, "detalle": estados}

@@ -11,7 +11,7 @@ cd ~/Código/radar-instrumentos
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 playwright install chromium
-pytest -q                      # 90 pruebas, sin red
+pytest -q                      # 94 pruebas, sin red
 python -m radar web            # tablero en http://127.0.0.1:8000
 ```
 
@@ -23,7 +23,9 @@ python -m radar web            # tablero en http://127.0.0.1:8000
 4. Opcional, para Facebook y MercadoLibre: `python scripts/login_facebook.py` (y luego
    `python scripts/login_facebook.py mercadolibre`). Se abre una ventana aparte; inicias sesión a mano y la
    cierras. La contraseña nunca pasa por el código.
-5. `python -m radar correr` hace una corrida completa e imprime el resumen.
+5. En el tablero, pestaña **Correr**: lanza primero una **corrida de prueba** (1 búsqueda, 12 publicaciones por
+   sitio) y mira el registro. Guardar la clave no busca nada por sí solo. En la terminal equivale a
+   `python -m radar correr --prueba`; sin `--prueba` hace la corrida completa.
 
 Corrida diaria a las 7:00: edita `deploy/com.radar.diario.plist` (reemplaza `RUTA_DEL_PROYECTO`), cópialo a
 `~/Library/LaunchAgents/` y ejecuta `launchctl load ~/Library/LaunchAgents/com.radar.diario.plist`.
@@ -67,6 +69,13 @@ Todos los porcentajes y topes se editan en **Parámetros**.
 La navegación real con Playwright (`radar/collectors/base.py`) **no se ha ejecutado todavía**: las pruebas usan
 muestras guardadas. La primera corrida real es la verificación pendiente; si un lector devuelve cero
 resultados, recibes el aviso `lector_sin_resultados` y hay que ajustar sus selectores.
+
+## Ciudades de Facebook
+
+La lista trae 24 ciudades (5 de Florida y 19 de otros estados) y se edita en Parámetros. Cada día se leen solo
+`ciudades_fb_por_dia` (4 por defecto), rotando, para no multiplicar las visitas con tu cuenta. Los nombres de
+ciudad siguen el formato de las direcciones de Marketplace y **no están verificados uno a uno**. eBay, Reverb y
+las tiendas no dependen de la ciudad: ya cubren todo EE. UU.
 
 ## Límites que la herramienta respeta
 
