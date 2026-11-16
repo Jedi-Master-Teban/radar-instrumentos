@@ -32,7 +32,7 @@ def correr(prueba: bool = False) -> int:
     log = lambda m: print(m, flush=True)
     limites = dict(max_consultas=1, max_por_lector=12) if prueba else {}
     log(f"TRM {trm:,.2f} · modelo {aj.nim_model or 'por defecto'} · {'PRUEBA (1 búsqueda, 12 por sitio)' if prueba else 'corrida completa'}")
-    modelo = Modelo(modelo=aj.nim_model, api_key=aj.nim_api_key)
+    modelo = Modelo(modelo=aj.nim_model, api_key=aj.nim_api_key, registrar=lambda t, d: db.evento(con, t, d))
     avisos = _notificador(aj, con)
     p = db.parametros(con)
     if not p.get("usar_playwright", 0):

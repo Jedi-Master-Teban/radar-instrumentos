@@ -38,7 +38,8 @@ _PROHIBIDO = re.compile(r"another buyer|other buyers?|other offers?|someone else
 
 
 def _extraer_json(texto: str):
-    texto = re.sub(r"^```(?:json)?|```$", "", (texto or "").strip(), flags=re.M).strip()
+    texto = re.sub(r"<think>.*?</think>", "", texto or "", flags=re.S)  # modelos que razonan en voz alta
+    texto = re.sub(r"^```(?:json)?|```$", "", texto.strip(), flags=re.M).strip()
     try:
         return json.loads(texto)
     except ValueError:
@@ -52,30 +53,42 @@ def _extraer_json(texto: str):
 
 
 class Modelo:
-    def __init__(self, cliente=None, modelo: str = "", api_key: str = ""):
+    def __init__(self, cliente=None, modelo: str = "", api_key: str = "", registrar=None):
         if cliente is None:
             from openai import OpenAI
 
-            cliente = OpenAI(base_url=NIM_BASE_URL, api_key=api_key)
+            cliente = OpenAI(base_url=NIM_BASE_URL, api_key=api_key, timeout=60, max_retries=1)
         self.cliente, self.modelo = cliente, modelo or MODELO_DEFECTO
+        self.registrar = registrar or (lambda tipo, detalle: None)
+        self._fallos = 0
 
-    def _chat(self, sistema: str, usuario: str, max_tokens: int = 500) -> str:
+    def _chat(self, sistema: str, usuario: str, max_tokens: int = 1500) -> str:
+        # margen amplio de tokens: algunos modelos gastan parte en razonar antes de responder
         r = self.cliente.chat.completions.create(
             model=self.modelo, temperature=0, max_tokens=max_tokens,
             messages=[{"role": "system", "content": sistema}, {"role": "user", "content": usuario}],
         )
         return r.choices[0].message.content or ""
 
+    def _fallo(self, donde: str, crudo) -> None:
+        """Guarda las primeras respuestas inválidas para poder diagnosticar el modelo elegido."""
+        self._fallos += 1
+        if self._fallos <= 8:
+            self.registrar("modelo_respuesta_invalida", f"{donde}: {str(crudo)[:400]!r}")
+
     def normalizar(self, titulo: str, descripcion: str) -> Normalizado | None:
         usuario = f"TÍTULO: {titulo}\nDESCRIPCIÓN: {(descripcion or '')[:1500]}"
+        crudo = ""
         for _ in range(2):  # un reintento ante JSON inválido
             try:
-                d = _extraer_json(self._chat(_SIS_NORMALIZAR, usuario))
-            except Exception:
-                d = None
+                crudo = self._chat(_SIS_NORMALIZAR, usuario)
+                d = _extraer_json(crudo)
+            except Exception as e:
+                crudo, d = f"{type(e).__name__}: {e}", None
             n = self._validar(d)
             if n is not None:
                 return n
+        self._fallo("normalizar", crudo)
         return None
 
     @staticmethod
@@ -98,10 +111,12 @@ class Modelo:
         usuario = (f"OBJETIVO: {objetivo.marca} {objetivo.modelo} ({objetivo.categoria})\nTÍTULOS:\n"
                    + "\n".join(f"{i + 1}. {t[:160]}" for i, t in enumerate(candidatos)))
         try:
-            r = _extraer_json(self._chat(_SIS_MISMO, usuario, max_tokens=400))
-        except Exception:
-            r = None
+            crudo = self._chat(_SIS_MISMO, usuario)
+            r = _extraer_json(crudo)
+        except Exception as e:
+            crudo, r = f"{type(e).__name__}: {e}", None
         if not isinstance(r, list) or len(r) != len(candidatos):
+            self._fallo(f"mismo_articulo ({len(candidatos)} títulos)", crudo)
             return [False] * len(candidatos)  # ante la duda, no se usa el comparable
         return [x is True for x in r]
 
@@ -113,7 +128,7 @@ class Modelo:
                    f"Comparable used range: ${val.p25_usd:,.0f}-${val.p75_usd:,.0f} ({val.n} listings)\n"
                    f"Defects stated in listing: {', '.join(n.defectos) or 'none'}")
         try:
-            texto = self._chat(_SIS_MENSAJE, usuario, max_tokens=200).strip()
+            texto = re.sub(r"<think>.*?</think>", "", self._chat(_SIS_MENSAJE, usuario), flags=re.S).strip()
         except Exception:
             return respaldo
         if not texto or _PROHIBIDO.search(texto) or f"{o.apertura_usd:,.0f}" not in texto:

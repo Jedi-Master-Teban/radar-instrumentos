@@ -70,6 +70,7 @@ def _evaluar(con, lid: int, l: Listing, modelo, fuentes_us: dict, fuentes_co: di
         return "descartado_estado"
     val, comps_us = referencia_us(con, fuentes_us, modelo, n, hoy)
     if val is None:
+        db.evento(con, "sin_valoracion_us", f"{n.marca} | {n.modelo} | {len(comps_us)} comparables aceptados")
         return "sin_valoracion_us"
     if n.categoria in ("guitarra", "bajo") and val.nuevo_usd is not None and not (
             p["precio_nuevo_min_usd"] <= val.nuevo_usd <= p["precio_nuevo_max_usd"]):

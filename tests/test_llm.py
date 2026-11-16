@@ -67,3 +67,15 @@ def test_mensaje_que_inventa_compradores_se_reemplaza():
 
 def test_mensaje_sin_el_monto_se_reemplaza():
     assert "$408" in Modelo(ClienteFalso("How about a discount?")).mensaje_oferta(listing(), N, OF, VAL)
+
+
+def test_modelo_que_razona_en_voz_alta():
+    assert Modelo(ClienteFalso("<think>veamos... {no es json}</think>\n" + OK)).normalizar("t", "d") is not None
+
+
+def test_respuestas_invalidas_se_registran():
+    reg = []
+    m = Modelo(ClienteFalso("basura"), registrar=lambda t, d: reg.append((t, d)))
+    m.normalizar("t", "d")
+    m.mismo_articulo(N, ["a", "b"])
+    assert [r[0] for r in reg] == ["modelo_respuesta_invalida"] * 2 and "basura" in reg[0][1]
