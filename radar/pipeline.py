@@ -11,7 +11,7 @@ from .costing import costo_puesto, flete_maximo, ingreso_neto, margen
 from .models import ESTADOS_ACEPTADOS, Listing
 from .offer import precio_techo, proponer
 from .scoring import puntaje, puntaje_ganga
-from .valuation import precio_reventa_co, referencia_co, referencia_us
+from .valuation import estimar_co, precio_reventa_co, referencia_co, referencia_us
 
 PRECIO_MIN_PREFILTRO = {"guitarra": 150, "bajo": 150, "pedal": 15, "cuerdas": 5}
 
@@ -97,30 +97,40 @@ def _evaluar(con, lid: int, l: Listing, modelo, fuentes_us: dict, fuentes_co: di
     descuento_us = 1 - l.precio_usd / val.mediana_usd
     flete_sup_cop = p["flete_supuesto_usd"].get(n.categoria, 0) * trm
     reventa = precio_reventa_co(ref, p)
-
-    tipo = oferta = None
-    datos: dict = {}
     if reventa is not None:
-        precio_co, n_co, origen = reventa
-        ingreso = ingreso_neto(precio_co, p)
-        techo = precio_techo(precio_co, l.envio_us_usd, n.categoria, trm, p)
-        oferta = proponer(l.precio_usd, techo, val)
+        confianza = "alta" if reventa[2] in ("manual", "usados en Colombia") else "media"
+    else:  # el modelo no aparece en Colombia: se estima un precio de referencia y se marca como tal
+        reventa, confianza = estimar_co(con, n, val, trm, p), "baja"
+
+    tipo = None
+    precio_co, n_co, origen = reventa
+    ingreso = ingreso_neto(precio_co, p)
+    techo = precio_techo(precio_co, l.envio_us_usd, n.categoria, trm, p)
+    oferta = proponer(l.precio_usd, techo, val)
+    compra = oferta.retiro_usd if oferta else l.precio_usd  # precio al que se supone la compra
+    costo_compra = costo_puesto(compra, l.envio_us_usd, trm, p)
+    total_compra = costo_compra.total_cop + flete_sup_cop
+    m = margen(ingreso, costo_compra.total_cop, flete_sup_cop)
+    # Solo cuenta si el margen se alcanza con una rebaja realista sobre el precio pedido
+    hay_margen = (oferta is not None and m >= p["margen_objetivo"] - 1e-9
+                  and oferta.retiro_usd >= (1 - p["rebaja_maxima_esperada"]) * l.precio_usd - 1e-9)
+    lista = precio_co / (1 - p["regateo_co"])
+    datos: dict = dict(
+        precio_co_cop=precio_co, origen_co=origen, confianza_co=confianza, margen_en_retiro=m, hay_margen=hay_margen,
+        compra_supuesta_usd=compra, rebaja_necesaria=1 - compra / l.precio_usd, margen_al_pedido=margen(ingreso, costo.total_cop, flete_sup_cop),
+        flete_maximo_cop=flete_maximo(ingreso, costo_compra.total_cop, p),
+        # precios para venderla en Colombia: publicar en "lista", cerrar cerca de "objetivo", nunca bajo "piso"
+        venta=dict(lista_cop=lista, objetivo_cop=precio_co, piso_cop=total_compra * (1 + p["margen_objetivo"]),
+                   margen_lista=ingreso_neto(lista, p) / total_compra - 1))
+    if hay_margen and confianza != "baja":
+        tipo = "reventa"
+        punt = puntaje(m, val.n, n_co, ref.manual, senales, dias)
+    elif confianza == "baja" and descuento_us >= p["ganga_descuento_min"]:
+        # No está en Colombia y está muy por debajo del mercado de EE. UU.: ganga, no se descarta.
+        oferta = oferta or proponer(l.precio_usd, None, val)
         if oferta is not None:
-            costo_retiro = costo_puesto(oferta.retiro_usd, l.envio_us_usd, trm, p)
-            m = margen(ingreso, costo_retiro.total_cop, flete_sup_cop)
-            if m >= p["margen_objetivo"] - 1e-9:
-                tipo = "reventa"
-                punt = puntaje(m, val.n, n_co, ref.manual, senales, dias)
-                datos.update(precio_co_cop=precio_co, origen_co=origen, margen_en_retiro=m,
-                             margen_al_pedido=margen(ingreso, costo.total_cop, flete_sup_cop),
-                             flete_maximo_cop=flete_maximo(ingreso, costo_retiro.total_cop, p))
-    else:
-        # No está en Colombia: no se descarta. Si está muy por debajo del mercado de EE. UU., es una ganga.
-        if descuento_us >= p["ganga_descuento_min"]:
-            oferta = proponer(l.precio_usd, None, val)
-            if oferta is not None:
-                tipo = "ganga"
-                punt = puntaje_ganga(descuento_us, val.n, senales, dias)
+            tipo = "ganga"
+            punt = puntaje_ganga(descuento_us, val.n, senales, dias)
     resultado = "oportunidad"
     if tipo is None:
         # No es oportunidad, pero se guarda como "observacion" para verla en el tablero con su comparación
@@ -135,8 +145,10 @@ def _evaluar(con, lid: int, l: Listing, modelo, fuentes_us: dict, fuentes_co: di
         veredicto = "Reventa con margen"
     elif tipo == "ganga":
         veredicto = "Ganga (no está en Colombia)"
-    elif reventa is not None:
+    elif confianza != "baja":
         veredicto = "Sin margen para Colombia"
+    elif hay_margen:
+        veredicto = "Posible reventa (precio de Colombia estimado)"
     elif descuento_us >= 0.10:
         veredicto = "Por debajo del mercado, sin llegar a ganga"
     elif descuento_us > -0.20:  # la mediana ya descuenta la negociación: un precio pedido típico queda en −11 %

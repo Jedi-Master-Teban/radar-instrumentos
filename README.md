@@ -11,7 +11,7 @@ cd ~/Código/radar-instrumentos
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 playwright install chromium
-pytest -q                      # 110 pruebas, sin red
+pytest -q                      # 118 pruebas, sin red
 python -m radar web            # tablero en http://127.0.0.1:8000
 ```
 

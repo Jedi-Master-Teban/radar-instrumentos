@@ -32,7 +32,10 @@ def _lanzar_corrida(aj: config.Ajustes, prueba: bool) -> int:
     import sys
 
     raiz = Path(__file__).resolve().parents[2]
-    args = [sys.executable, "-u", "-m", "radar", "correr"] + (["--prueba"] if prueba else [])
+    if prueba == "colombia":
+        args = [sys.executable, "-u", "-m", "radar", "colombia"]
+    else:
+        args = [sys.executable, "-u", "-m", "radar", "correr"] + (["--prueba"] if prueba else [])
     with open(aj.home / "corrida.log", "w") as salida:
         proc = subprocess.Popen(args, cwd=raiz, stdout=salida, stderr=subprocess.STDOUT, start_new_session=True)
     return proc.pid
@@ -101,10 +104,10 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo, carpeta_ca
 
     @app.post("/corrida")
     def iniciar_corrida(modo: str = Form("prueba")):
-        if modo not in ("prueba", "completa"):
+        if modo not in ("prueba", "completa", "colombia"):
             raise HTTPException(422, "Modo no válido")
         if not corrida_activa():
-            (aj.home / "corrida.pid").write_text(str(lanzar(aj, modo == "prueba")))
+            (aj.home / "corrida.pid").write_text(str(lanzar(aj, "colombia" if modo == "colombia" else modo == "prueba")))
         return RedirectResponse("/corrida", status_code=303)
 
     @app.middleware("http")

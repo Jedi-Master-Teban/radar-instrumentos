@@ -19,7 +19,7 @@
 <h2>Lanzar una corrida</h2>
 {% if not nim %}<p class="aviso">Falta la clave de NVIDIA NIM: guárdala en <a href="/ajustes">Ajustes</a>.</p>{% endif %}
 {% if not activa %}<form class="fila" method="post" action="/corrida">
-<button name="modo" value="prueba">Corrida de prueba</button><button name="modo" value="completa">Corrida completa</button>
+<button name="modo" value="colombia">Actualizar precios de Colombia</button><button name="modo" value="prueba">Corrida de prueba</button><button name="modo" value="completa">Corrida completa</button>
 <span class="suave">Evalúa con el modelo de NIM lo capturado en ~/.radar/ingesta. Las capturas de <code>datos/capturas/</code> se importan solas al abrir Publicaciones.</span></form>{% endif %}
 {% if registro %}<details><summary>Registro técnico de la última corrida</summary><pre>{{ registro }}</pre></details>{% endif %}
 {% endblock %}

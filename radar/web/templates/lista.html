@@ -20,7 +20,7 @@
 {% for nombre, ops in grupos %}
 <h2>{{ nombre }} <span class="suave">· {{ ops|length }}</span></h2>
 <div class="envoltura"><table>
-<tr><th>Publicación</th><th>Veredicto</th><th class="n">Precio</th><th class="n">EE. UU. usado<small>mediana ajustada</small></th><th class="n">EE. UU. nuevo</th><th class="n">Frente al mercado</th><th class="n">Colombia</th><th class="n">Costo puesto<small>sin flete</small></th><th class="n">Margen</th><th class="n">Oferta sugerida<small>apertura → techo</small></th></tr>
+<tr><th>Publicación</th><th>Veredicto</th><th class="n">Precio</th><th class="n">EE. UU. usado<small>mediana ajustada</small></th><th class="n">EE. UU. nuevo</th><th class="n">Frente al mercado</th><th class="n">Colombia<small>precio de referencia</small></th><th class="n">Costo puesto<small>sin flete</small></th><th class="n">Oferta sugerida<small>apertura → techo</small></th><th class="n">Venta sugerida<small>lista → piso</small></th><th class="n">Margen<small>comprando al techo</small></th></tr>
 {% for o in ops %}<tr class="{{ 'op' if o.tipo != 'observacion' }}">
 <td><a class="tit" href="{{ o.listing.url }}" target="_blank" rel="noopener">{{ o.normalizado.marca }} {{ o.normalizado.modelo }} ↗</a>
 <small>{{ o.listing.titulo[:70] }}</small>
@@ -32,10 +32,11 @@
 <td class="n">{{ o.valoracion_us.nuevo_usd|usd }}</td>
 <td class="n {{ 'pos' if o.descuento_us >= 0.10 else 'neg' }}">{% if o.descuento_us >= 0 %}−{{ o.descuento_us|pct }}{% else %}+{{ (-o.descuento_us)|pct }}{% endif %}</td>
 {% else %}<td class="n suave">—<small>menos de 3 refs</small></td><td class="n suave">—</td><td class="n suave">—</td>{% endif %}
-<td class="n">{% if o.precio_co_cop is defined %}{{ o.precio_co_cop|cop }}<small>{{ o.origen_co }}</small>{% elif o.referencia_co and (o.referencia_co.nuevo_cop or o.referencia_co.usado_cop) %}{{ (o.referencia_co.usado_cop or o.referencia_co.nuevo_cop)|cop }}{% elif o.referencia_co %}<span class="suave">no está</span>{% else %}<span class="suave">sin consultar</span>{% endif %}</td>
+<td class="n">{% if o.precio_co_cop is defined %}{{ o.precio_co_cop|cop }}<small>{{ 'estimado' if o.confianza_co == 'baja' else o.origen_co }}</small>{% else %}<span class="suave">—</span>{% endif %}</td>
 <td class="n">{{ o.costo.total_cop|cop }}</td>
-<td class="n">{% if o.margen_en_retiro is defined %}<span class="pos">{{ o.margen_en_retiro|pct }}</span>{% else %}<span class="suave">—</span>{% endif %}</td>
 <td class="n">{% if o.oferta %}{{ o.oferta.apertura_usd|usd }} → {{ o.oferta.techo_usd|usd }}{% else %}<span class="suave">—</span>{% endif %}</td>
+<td class="n">{% if o.venta is defined %}{{ o.venta.lista_cop|cop }}<small>piso {{ o.venta.piso_cop|cop }}</small>{% else %}<span class="suave">—</span>{% endif %}</td>
+<td class="n">{% if o.margen_en_retiro is defined %}<span class="{{ 'pos' if o.hay_margen else 'neg' }}">{{ o.margen_en_retiro|pct }}</span>{% if o.rebaja_necesaria and o.rebaja_necesaria > 0.005 %}<small>pide −{{ o.rebaja_necesaria|pct }}</small>{% endif %}{% else %}<span class="suave">—</span>{% endif %}</td>
 </tr>{% endfor %}</table></div>
 {% endfor %}
 {% endblock %}

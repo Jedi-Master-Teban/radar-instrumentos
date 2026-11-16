@@ -7,6 +7,7 @@ from datetime import date
 from statistics import median, quantiles
 
 from . import db
+from .costing import costo_puesto
 from .collectors.base import LectorBloqueado
 from .models import Normalizado, PrecioTienda, ReferenciaCO, ValoracionUS
 
@@ -140,3 +141,78 @@ def fijar_referencia_manual(con, marca: str, modelo: str, usado_cop: float, hoy:
                 "values(?,?,?,0,0,?,1) on conflict(marca, modelo) do update set usado_cop=excluded.usado_cop, "
                 "manual=1, fecha=excluded.fecha", (marca, modelo, usado_cop, hoy.isoformat()))
     con.commit()
+
+
+def sobreprecio_marca(con, marca: str, trm: float) -> tuple[float, int, str] | None:
+    """Cuántas veces vale en Colombia un modelo nuevo frente a su precio nuevo en EE. UU. convertido a pesos.
+
+    Usa los modelos que tienen precio nuevo en ambos países: primero los de la marca, si no los de todas.
+    """
+    de_marca, todas = [], []
+    for f in con.execute("select c.marca, c.nuevo_cop, u.datos from referencias_co c join referencias_us u "
+                         "on u.marca = c.marca and u.modelo = c.modelo where c.nuevo_cop is not null"):
+        nuevo_usd = (json.loads(f["datos"]) or {}).get("nuevo_usd")
+        if not nuevo_usd:
+            continue
+        r = f["nuevo_cop"] / (nuevo_usd * trm)
+        if 0.8 <= r <= 4:  # fuera de eso, casi seguro es otro artículo
+            todas.append(r)
+            if f["marca"].lower() == marca.lower():
+                de_marca.append(r)
+    if de_marca:
+        return median(de_marca), len(de_marca), marca
+    if len(todas) >= 3:
+        return median(todas), len(todas), "todas las marcas"
+    return None
+
+
+def estimar_co(con, n: Normalizado, val: ValoracionUS, trm: float, p: dict) -> tuple[float, int, str]:
+    """Precio de venta estimado en Colombia para un modelo que no aparece allí. Siempre devuelve algo."""
+    f = p["factor_usado_sobre_nuevo_co"]
+    flete = p["flete_supuesto_usd"].get(n.categoria, 0) * trm
+    if val.nuevo_usd:
+        sp = sobreprecio_marca(con, n.marca, trm)
+        if sp:
+            return val.nuevo_usd * trm * sp[0] * f, min(sp[1], 3), f"estimado: sobreprecio de {sp[2]} ×{sp[0]:.2f}"
+        return ((costo_puesto(val.nuevo_usd, 0, trm, p).total_cop + flete) * f, 1,
+                "estimado: paridad de importación del nuevo")
+    return (costo_puesto(val.mediana_usd, 0, trm, p).total_cop + flete, 1,
+            "estimado: costo de traer una usada")
+
+
+def _sin_tildes(t: str) -> str:
+    import unicodedata
+
+    return "".join(c for c in unicodedata.normalize("NFD", t.lower()) if unicodedata.category(c) != "Mn")
+
+
+class ModeloPorPalabras:
+    """Decide si un título es el mismo artículo sin modelo de lenguaje: debe contener todas las palabras."""
+
+    @staticmethod
+    def _fichas(t: str) -> set[str]:
+        import re
+
+        return set(re.findall(r"[a-z0-9]+", _sin_tildes(t)))
+
+    def mismo_articulo(self, objetivo: Normalizado, candidatos: list[str]) -> list[bool]:
+        necesarias = self._fichas(f"{objetivo.marca} {objetivo.modelo}")
+        return [necesarias <= self._fichas(c) for c in candidatos]
+
+
+def actualizar_colombia(con, fuentes_co: dict, hoy: date, log=lambda m: None) -> dict:
+    """Consulta las tiendas de Colombia para cada modelo evaluado y deja las capturas listas para reevaluar."""
+    modelos = {}
+    for f in con.execute("select datos from oportunidades"):
+        n = json.loads(f["datos"])["normalizado"]
+        modelos[(n["marca"], n["modelo"])] = n["categoria"]
+    encontrados = 0
+    for (marca, modelo), categoria in sorted(modelos.items()):
+        ref, _ = referencia_co(con, fuentes_co, ModeloPorPalabras(), Normalizado(marca, modelo, categoria, "bueno"), hoy)
+        if ref.n_usado or ref.n_nuevo:
+            encontrados += 1
+            log(f"{marca} {modelo}: {ref.n_nuevo} nuevos, {ref.n_usado} usados en Colombia")
+    db.set_parametro(con, "capturas_importadas", {})  # fuerza la reevaluación al abrir el tablero
+    resumen = {"modelos": len(modelos), "con_precio_en_colombia": encontrados}
+    db.evento(con, "colombia", json.dumps(resumen))
+    return resumen

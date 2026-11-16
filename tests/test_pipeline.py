@@ -150,3 +150,30 @@ def test_palabra_prioritaria_sube_el_puntaje(con):
     por_id = {a["listing"]["id_externo"]: a for a in av.alertas}
     assert por_id["N2"]["puntaje"] == approx(por_id["N1"]["puntaje"] * 1.25)
     assert "prioritario: neck-thru" in por_id["N2"]["senales"] and av.alertas[0]["listing"]["id_externo"] == "N2"
+
+
+def test_estimado_no_alerta_como_reventa_pero_trae_venta_sugerida(con):
+    # no está en Colombia y solo 12 % bajo el mercado: no es ganga ni reventa, pero queda con referencia y precios
+    r, av = ejecutar(con, {"ebay": lector(listing(710))}, fuentes_co={"meli": Contador([])})
+    assert av.alertas == []
+    d = json.loads(con.execute("select datos from oportunidades").fetchone()[0])
+    assert d["confianza_co"] == "baja" and d["origen_co"].startswith("estimado: paridad de importación")
+    v = d["venta"]
+    assert v["piso_cop"] <= v["objetivo_cop"] * 1.000001  # comprando al techo, el piso coincide con el objetivo
+    assert v["lista_cop"] == approx(v["objetivo_cop"] / 0.93)
+
+
+def test_margen_que_exige_rebaja_irreal_no_es_oportunidad(con):
+    # la referencia de Colombia solo deja margen pagando ~30 % menos de lo pedido
+    r, av = ejecutar(con, {"ebay": lector(listing(800))}, fuentes_co={"meli": co(usado=4_400_000)},
+                     fuentes_us={"reverb": us(usado=1000, nuevo=1300)})
+    d = json.loads(con.execute("select datos from oportunidades").fetchone()[0])
+    assert av.alertas == [] and d["hay_margen"] is False and d["rebaja_necesaria"] > 0.15
+    assert d["veredicto"] == "Sin margen para Colombia"
+
+
+def test_venta_sugerida_en_reventa(con):
+    r, av = ejecutar(con, {"ebay": lector(listing(500))})
+    v = av.alertas[0]["venta"]
+    assert v["objetivo_cop"] == approx(3_960_000) and v["lista_cop"] == approx(3_960_000 / 0.93)
+    assert v["piso_cop"] == approx((2_463_843.33 + 120 * 3270) * 1.25, rel=1e-6) and v["piso_cop"] < v["objetivo_cop"]

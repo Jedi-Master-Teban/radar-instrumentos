@@ -26,6 +26,8 @@ PARAMETROS_DEFECTO: dict = {
     "sospecha_bajo": 0.50,
     "descuento_negociacion_us": 0.10,
     "factor_usado_sobre_nuevo_co": 0.70,
+    "rebaja_maxima_esperada": 0.15,  # rebaja sobre el precio pedido que se considera alcanzable al negociar
+    "regateo_co": 0.07,  # cuánto se espera rebajar del precio de lista al cerrar la venta en Colombia
     "min_comparables_us": 3,
     "max_normalizar_dia": 200,
     "trm_manual": None,

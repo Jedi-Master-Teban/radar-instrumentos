@@ -1,4 +1,4 @@
-"""Uso:  python -m radar correr [--prueba] | web | modelos | probar-telegram"""
+"""Uso:  python -m radar correr [--prueba] | colombia | web | modelos | probar-telegram"""
 from __future__ import annotations
 
 import json
@@ -82,6 +82,22 @@ def _correr_con_ingesta(con, aj, p, modelo, avisos, trm, log, limites) -> dict:
                    **limites)
 
 
+def colombia() -> int:
+    """Actualiza los precios de referencia de Colombia consultando las tiendas por HTTP directo."""
+    from .collectors import tiendas
+    from .collectors.http import ClienteHttp
+    from .valuation import actualizar_colombia
+
+    aj = config.cargar()
+    con = db.conectar(aj.ruta_db)
+    http = ClienteHttp()
+    fuentes = {t["nombre"]: (lambda c, t=t: tiendas.buscar_tienda_co(http, t, c)) for t in db.parametros(con)["tiendas_co"]}
+    print("Consultando tiendas de Colombia...", flush=True)
+    print(json.dumps(actualizar_colombia(con, fuentes, date.today(), log=lambda m: print(m, flush=True)),
+                     ensure_ascii=False, indent=2))
+    return 0
+
+
 def web() -> int:
     import uvicorn
 
@@ -108,7 +124,7 @@ def probar_telegram() -> int:
 
 
 def main(argv: list[str]) -> int:
-    orden = {"correr": correr, "web": web, "modelos": modelos, "probar-telegram": probar_telegram}
+    orden = {"correr": correr, "colombia": colombia, "web": web, "modelos": modelos, "probar-telegram": probar_telegram}
     if len(argv) < 2 or argv[1] not in orden:
         print(__doc__)
         return 1

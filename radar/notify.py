@@ -32,8 +32,11 @@ def formato_alerta(op: dict) -> str:
     else:
         lineas.append("Colombia: sin publicaciones de este modelo")
     lineas.append(f"Costo puesto sin flete: {cop(c['total_cop'])} (TRM {op['trm']:,.0f})")
+    v = op.get("venta")
+    if v:
+        lineas.append(f"Venta en Colombia: lista {cop(v['lista_cop'])} · objetivo {cop(v['objetivo_cop'])} · "
+                      f"piso {cop(v['piso_cop'])} ({e(op['origen_co'])})")
     if op["tipo"] == "reventa":
-        lineas.append(f"Venta esperada: {cop(op['precio_co_cop'])} ({e(op['origen_co'])})")
         lineas.append(f"Flete máximo: {cop(op['flete_maximo_cop'])} · Margen al precio de retiro: "
                       f"{op['margen_en_retiro'] * 100:.0f} %")
     else:
