@@ -34,18 +34,52 @@ def correr(prueba: bool = False) -> int:
     log(f"TRM {trm:,.2f} · modelo {aj.nim_model or 'por defecto'} · {'PRUEBA (1 búsqueda, 12 por sitio)' if prueba else 'corrida completa'}")
     modelo = Modelo(modelo=aj.nim_model, api_key=aj.nim_api_key)
     avisos = _notificador(aj, con)
-    oculto = not db.parametros(con).get("navegador_visible", 1)
-    with Navegador(headless=oculto) as nav:
-        if hay_perfil(aj):
-            with Navegador(perfil=aj.perfil_fb, headless=oculto) as nav_sesion:
-                resumen = tuberia(con, *armar(con, aj, nav, nav_sesion, trm), modelo, avisos, trm, date.today(),
+    p = db.parametros(con)
+    if not p.get("usar_playwright", 0):
+        resumen = _correr_con_ingesta(con, aj, p, modelo, avisos, trm, log, limites)
+    else:
+        oculto = not p.get("navegador_visible", 1)
+        with Navegador(headless=oculto) as nav:
+            if hay_perfil(aj):
+                with Navegador(perfil=aj.perfil_fb, headless=oculto) as nav_sesion:
+                    resumen = tuberia(con, *armar(con, aj, nav, nav_sesion, trm), modelo, avisos, trm, date.today(),
+                                      log=log, **limites)
+            else:
+                print("Sin sesión guardada: se omiten Facebook y MercadoLibre (ejecuta scripts/login_facebook.py).")
+                resumen = tuberia(con, *armar(con, aj, nav, None, trm), modelo, avisos, trm, date.today(),
                                   log=log, **limites)
-        else:
-            print("Sin sesión guardada: se omiten Facebook y MercadoLibre (ejecuta scripts/login_facebook.py).")
-            resumen = tuberia(con, *armar(con, aj, nav, None, trm), modelo, avisos, trm, date.today(),
-                              log=log, **limites)
     print(json.dumps(resumen, ensure_ascii=False, indent=2))
     return 0
+
+
+def _correr_con_ingesta(con, aj, p, modelo, avisos, trm, log, limites) -> dict:
+    """Usa lo capturado en ~/.radar/ingesta/ y consulta las tiendas de Colombia por HTTP directo."""
+    from .collectors import tiendas
+    from .collectors.http import ClienteHttp
+    from .ingesta import FuentePrecios, cargar_listings
+    from .models import PrecioTienda
+    from .pipeline import correr as tuberia
+
+    carpeta = aj.home / "ingesta"
+    listings = cargar_listings(carpeta, trm)
+    log(f"Ingesta: {len(listings)} publicaciones capturadas en {carpeta}")
+    entregado = []
+
+    def lector(_consulta):
+        if entregado:
+            return []
+        entregado.append(1)
+        return listings
+
+    # los precios pedidos de eBay capturados también sirven como comparables de usados
+    propios = [PrecioTienda("ebay", l.titulo, l.precio_usd, "usado", l.url) for l in listings]
+    http = ClienteHttp()
+    fuentes_us = {"capturado": FuentePrecios(carpeta / "precios_us.json", propios)}
+    fuentes_co = {t["nombre"]: (lambda c, t=t: tiendas.buscar_tienda_co(http, t, c)) for t in p["tiendas_co"]}
+    fuentes_co["capturado"] = FuentePrecios(carpeta / "precios_co.json")
+    limites = {k: v for k, v in limites.items() if k != "max_por_lector"}
+    return tuberia(con, {"ingesta": lector}, fuentes_us, fuentes_co, modelo, avisos, trm, date.today(), log=log,
+                   **limites)
 
 
 def web() -> int:

@@ -153,7 +153,9 @@ def correr(con, lectores: dict, fuentes_us: dict, fuentes_co: dict, modelo, noti
     """lectores: nombre -> callable(consulta) -> list[Listing]. max_* limitan una corrida de prueba."""
     p = db.parametros(con)
     pendientes, total, errores = _recolectar(con, lectores, p, hoy, notificador, max_consultas, max_por_lector, log)
-    log(f"{total} publicaciones dentro de rango; {len(pendientes)} nuevas o rebajadas por evaluar")
+    ya = {lid for lid, _l, _c in pendientes}
+    pendientes += [(lid, l, "") for lid, l in db.reintentables(con) if lid not in ya]
+    log(f"{total} publicaciones dentro de rango; {len(pendientes)} por evaluar (nuevas, rebajadas o reintentos)")
     estados: dict[str, int] = {}
     for i, (lid, l, _cat) in enumerate(pendientes[: int(p["max_normalizar_dia"])], 1):
         try:

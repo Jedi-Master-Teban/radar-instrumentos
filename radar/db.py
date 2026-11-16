@@ -34,7 +34,9 @@ PARAMETROS_DEFECTO: dict = {
                     "houston", "dallas", "austin", "atlanta", "nashville", "philly", "boston", "dc", "seattle",
                     "sanfrancisco", "sandiego", "phoenix", "denver", "vegas", "detroit", "charlotte"],
     "ciudades_fb_por_dia": 4,
-    "navegador_visible": 1,  # 1 = ventana visible de Chrome; 0 = oculto (eBay y Reverb lo rechazan)
+    "navegador_visible": 1,
+    # 0 = no abrir sitios con Playwright (eBay, Reverb y Guitar Center lo bloquean); se usa la ingesta
+    "usar_playwright": 0,  # 1 = ventana visible de Chrome; 0 = oculto (eBay y Reverb lo rechazan)
     "tiendas_co": [
         {"nombre": "Ortizo", "origen": "https://ortizo.com.co", "plataforma": "shopify"},
         {"nombre": "La Colonial", "origen": "https://www.lacolonial.com.co", "plataforma": "shopify"},
@@ -171,3 +173,16 @@ def evento(con, tipo: str, detalle: str) -> None:
     con.execute("insert into eventos(fecha, tipo, detalle) values(?,?,?)",
                 (datetime.now().isoformat(timespec="seconds"), tipo, detalle))
     con.commit()
+
+
+def reintentables(con) -> list[tuple[int, Listing]]:
+    """Publicaciones que quedaron sin valorar por falta de datos: se reevalúan en la siguiente corrida."""
+    salida = []
+    for f in con.execute("select * from listings where proceso in ('sin_valoracion_us', 'error', 'pendiente')"):
+        salida.append((f["id"], Listing(
+            plataforma=f["plataforma"], id_externo=f["id_externo"], url=f["url"], titulo=f["titulo"],
+            precio_usd=f["precio_usd"], descripcion=f["descripcion"] or "", envio_us_usd=f["envio_us_usd"] or 0.0,
+            acepta_ofertas=bool(f["acepta_ofertas"]), hace_envios=bool(f["hace_envios"]),
+            fecha_publicacion=date.fromisoformat(f["fecha_publicacion"]) if f["fecha_publicacion"] else None,
+            fotos=json.loads(f["fotos"] or "[]"), estado_declarado=f["estado_declarado"] or "")))
+    return salida

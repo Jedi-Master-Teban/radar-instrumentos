@@ -71,8 +71,12 @@ def _recolectar(con, fuentes: dict, consulta: str, *args) -> list[PrecioTienda]:
 def _filtrar(modelo, n: Normalizado, items: list[PrecioTienda]) -> list[PrecioTienda]:
     if not items:
         return []
-    marcas = modelo.mismo_articulo(n, [i.titulo for i in items])
-    return [i for i, ok in zip(items, marcas) if ok]
+    salida = []
+    for a in range(0, len(items), 40):  # en bloques, para no pasarle listas enormes al modelo
+        bloque = items[a:a + 40]
+        marcas = modelo.mismo_articulo(n, [i.titulo for i in bloque])
+        salida += [i for i, ok in zip(bloque, marcas) if ok]
+    return salida
 
 
 def _vigente(fecha_iso: str, hoy: date, dias: int) -> bool:
@@ -92,6 +96,8 @@ def referencia_us(con, fuentes_us: dict, modelo, n: Normalizado, hoy: date) -> t
     nuevos = _filtrar(modelo, n, _recolectar(con, fuentes_us, consulta, "nuevo"))
     val = calcular_valoracion_us(usados, nuevos, p)
     detalle = [asdict(x) for x in (usados + nuevos)[:12]]
+    if val is None:
+        return None, detalle  # no se guarda un "sin datos": se reintenta en la siguiente corrida
     con.execute("insert into referencias_us(marca, modelo, datos, fecha, detalle) values(?,?,?,?,?) "
                 "on conflict(marca, modelo) do update set datos=excluded.datos, fecha=excluded.fecha, "
                 "detalle=excluded.detalle",
@@ -113,8 +119,10 @@ def referencia_co(con, fuentes_co: dict, modelo, n: Normalizado, hoy: date) -> t
         return _ref_de_fila(fila), json.loads(fila["detalle"] or "[]")
     items = _filtrar(modelo, n, _recolectar(con, fuentes_co, f"{n.marca} {n.modelo}"))
     ref = calcular_referencia_co(items, hoy, p)
-    if fila and not items:  # todo bloqueado o vacío: se conserva la referencia vencida
-        return _ref_de_fila(fila), json.loads(fila["detalle"] or "[]")
+    if not items:  # todo bloqueado o vacío: se conserva la referencia vencida y no se guarda un "sin datos"
+        if fila:
+            return _ref_de_fila(fila), json.loads(fila["detalle"] or "[]")
+        return ref, []
     detalle = [asdict(x) for x in items[:12]]
     con.execute("insert into referencias_co(marca, modelo, usado_cop, nuevo_cop, n_usado, n_nuevo, fecha, manual, detalle)"
                 " values(?,?,?,?,?,?,?,0,?) on conflict(marca, modelo) do update set usado_cop=excluded.usado_cop,"

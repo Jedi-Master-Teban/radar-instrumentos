@@ -134,3 +134,10 @@ def test_resumen_queda_en_eventos(con):
     ejecutar(con, {"ebay": lector(listing(500))})
     d = json.loads(con.execute("select detalle from eventos where tipo='corrida'").fetchone()[0])
     assert d["alertas"] == 1
+
+
+def test_sin_valoracion_se_reintenta_cuando_llegan_comparables(con):
+    r, _ = ejecutar(con, {"ebay": lector(listing(500))}, fuentes_us={"reverb": Contador([])})
+    assert r["detalle"] == {"sin_valoracion_us": 1}
+    r, av = ejecutar(con, {"ebay": lector(listing(500))})  # misma publicación, ahora con comparables
+    assert r["alertas"] == 1
