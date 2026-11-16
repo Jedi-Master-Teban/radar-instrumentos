@@ -24,6 +24,10 @@ PARAMETROS_DEFECTO: dict = {
     "precio_nuevo_max_usd": 3500,
     "ganga_descuento_min": 0.30,
     "sospecha_bajo": 0.50,
+    "descuento_negociacion_us": 0.10,
+    "factor_usado_sobre_nuevo_co": 0.70,
+    "min_comparables_us": 3,
+    "max_normalizar_dia": 200,
     "trm_manual": None,
     "ciudades_fb": ["miami", "houston", "dallas", "atlanta", "nyc", "la"],
 }
