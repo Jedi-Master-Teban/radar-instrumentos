@@ -109,6 +109,11 @@ def _evaluar(con, lid: int, l: Listing, modelo, fuentes_us: dict, fuentes_co: di
                 punt = puntaje_ganga(descuento_us, val.n, senales, dias)
     if tipo is None:
         return "sin_margen"
+    texto = f"{l.titulo} {l.descripcion}".lower()
+    prioritarias = [w for w in p.get("palabras_prioritarias", []) if w.lower() in texto]
+    if prioritarias:
+        punt *= 1.25
+        senales.append("prioritario: " + prioritarias[0])
 
     banderas = []
     if l.precio_usd < p["sospecha_bajo"] * val.mediana_usd:

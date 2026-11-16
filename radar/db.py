@@ -36,7 +36,9 @@ PARAMETROS_DEFECTO: dict = {
     "ciudades_fb_por_dia": 4,
     "navegador_visible": 1,
     # 0 = no abrir sitios con Playwright (eBay, Reverb y Guitar Center lo bloquean); se usa la ingesta
-    "usar_playwright": 0,  # 1 = ventana visible de Chrome; 0 = oculto (eBay y Reverb lo rechazan)
+    "usar_playwright": 0,
+    # Si el título o la descripción contiene alguna, el puntaje sube 25 % y la alerta lo señala
+    "palabras_prioritarias": ["neck-thru", "neck thru", "neck-through", "neck through"],  # 1 = ventana visible de Chrome; 0 = oculto (eBay y Reverb lo rechazan)
     "tiendas_co": [
         {"nombre": "Ortizo", "origen": "https://ortizo.com.co", "plataforma": "shopify"},
         {"nombre": "La Colonial", "origen": "https://www.lacolonial.com.co", "plataforma": "shopify"},

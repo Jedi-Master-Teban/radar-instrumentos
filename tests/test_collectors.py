@@ -111,3 +111,8 @@ def test_mercadolibre():
     ps = mercadolibre.parse_busqueda(leer("meli_busqueda.html"))
     assert [(p.precio, p.condicion) for p in ps] == [(3200000.0, "usado"), (4899900.0, "nuevo")]
     assert ps[0].url == "https://articulo.mercadolibre.com.co/MCO-1-fender-player"
+
+
+def test_ebay_busca_solo_articulos_ubicados_en_eeuu():
+    u = ebay.url_busqueda("strandberg guitar", precio_min=400)
+    assert "LH_LocatedIn=1" in u and "_stpos=33166" in u and "LH_PrefLoc" not in u and "_udlo=400" in u

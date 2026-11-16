@@ -17,8 +17,10 @@ _OTRO_PAIS = re.compile(r"^(?:de|from)\s+(?!estados unidos|united states)(.+)$",
 
 
 def url_busqueda(consulta: str, pagina: int = 1, precio_min: int = 0) -> str:
+    # Artículos UBICADOS en EE. UU. y envío calculado a un código postal de Miami (casillero).
+    # Sin esto, visto desde Colombia eBay muestra sobre todo vendedores de Japón (58 de 62 el 16 nov 2026).
     u = (f"https://www.ebay.com/sch/i.html?_nkw={quote_plus(consulta)}"
-         "&LH_ItemCondition=3000&LH_BO=1&LH_PrefLoc=1&_sop=10")
+         "&LH_ItemCondition=3000&LH_BO=1&_sop=10&LH_LocatedIn=1&_salic=1&_stpos=33166&_fcid=1&_ipg=120")
     if precio_min:
         u += f"&_udlo={precio_min}"
     if pagina > 1:

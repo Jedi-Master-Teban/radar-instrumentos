@@ -141,3 +141,12 @@ def test_sin_valoracion_se_reintenta_cuando_llegan_comparables(con):
     assert r["detalle"] == {"sin_valoracion_us": 1}
     r, av = ejecutar(con, {"ebay": lector(listing(500))})  # misma publicación, ahora con comparables
     assert r["alertas"] == 1
+
+
+def test_palabra_prioritaria_sube_el_puntaje(con):
+    normal = listing(500, id_externo="N1", titulo="Strandberg Boden Standard")
+    nt = listing(500, id_externo="N2", titulo="Strandberg Boden Neck-Thru 6")
+    r, av = ejecutar(con, {"ebay": lector(normal, nt)})
+    por_id = {a["listing"]["id_externo"]: a for a in av.alertas}
+    assert por_id["N2"]["puntaje"] == approx(por_id["N1"]["puntaje"] * 1.25)
+    assert "prioritario: neck-thru" in por_id["N2"]["senales"] and av.alertas[0]["listing"]["id_externo"] == "N2"

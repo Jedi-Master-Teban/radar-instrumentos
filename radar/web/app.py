@@ -182,6 +182,9 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo) -> FastAPI
                 db.set_parametro(c, "flete_supuesto_usd", db.parametros(c)["flete_supuesto_usd"] | fletes)
             if str(form.get("ciudades_fb", "")).strip():
                 db.set_parametro(c, "ciudades_fb", [x.strip().lower() for x in str(form["ciudades_fb"]).split(",") if x.strip()])
+            if "palabras_prioritarias" in form:
+                db.set_parametro(c, "palabras_prioritarias",
+                                 [x.strip().lower() for x in str(form["palabras_prioritarias"]).split(",") if x.strip()])
             if str(form.get("tiendas_co", "")).strip():
                 tiendas = json.loads(str(form["tiendas_co"]))
                 for t in tiendas:

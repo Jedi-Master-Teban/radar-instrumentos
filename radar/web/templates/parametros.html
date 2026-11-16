@@ -5,6 +5,7 @@
 <div><label>trm_manual (respaldo)</label><input name="trm_manual" value="{{ p.trm_manual or '' }}"></div>
 {% for cat, v in p.flete_supuesto_usd.items() %}<div><label>Flete supuesto USD · {{ cat }}</label><input name="flete_{{ cat }}" value="{{ v }}"></div>{% endfor %}
 <div><label>Ciudades de Facebook (separadas por coma)</label><input name="ciudades_fb" value="{{ p.ciudades_fb|join(', ') }}"></div>
+<div><label>Palabras prioritarias (separadas por coma)</label><input name="palabras_prioritarias" value="{{ p.palabras_prioritarias|join(', ') }}"></div>
 </div>
 <h2>Tiendas de Colombia</h2><p class="suave">Lista en JSON. Plataformas admitidas: shopify, woocommerce.</p>
 <textarea name="tiendas_co" rows="9" style="width:100%;font-family:ui-monospace,monospace">{{ tiendas_json }}</textarea>
