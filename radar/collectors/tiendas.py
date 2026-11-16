@@ -10,14 +10,7 @@ from bs4 import BeautifulSoup
 from ..models import PrecioTienda
 from .base import Navegador
 
-# Tiendas de Colombia verificadas el 15 nov 2026. Se pueden añadir más desde el tablero.
-TIENDAS_CO_DEFECTO = [
-    {"nombre": "Ortizo", "origen": "https://ortizo.com.co", "plataforma": "shopify"},
-    {"nombre": "La Colonial", "origen": "https://www.lacolonial.com.co", "plataforma": "shopify"},
-    {"nombre": "TMS Music", "origen": "https://tmsmusic.co", "plataforma": "shopify"},
-    {"nombre": "Music Head Store", "origen": "https://musicheadstore.com", "plataforma": "woocommerce"},
-    {"nombre": "Duosonic", "origen": "https://duosonic.co", "plataforma": "woocommerce"},
-]
+# La lista de tiendas de Colombia vive en el parámetro "tiendas_co" (editable en el tablero).
 
 
 def parse_shopify(datos: dict | None, tienda: dict) -> list[PrecioTienda]:

@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block cuerpo %}
+<h1>Oportunidades</h1>
+<form class="fila" method="get">
+<div><label>Estado</label><select name="estado"><option value="">Todos</option>{% for e in estados %}<option {{ 'selected' if f.estado==e }}>{{ e }}</option>{% endfor %}</select></div>
+<div><label>Tipo</label><select name="tipo"><option value="">Todos</option><option {{ 'selected' if f.tipo=='reventa' }}>reventa</option><option {{ 'selected' if f.tipo=='ganga' }}>ganga</option></select></div>
+<div><label>Plataforma</label><select name="plataforma"><option value="">Todas</option>{% for x in ['ebay','reverb','facebook'] %}<option {{ 'selected' if f.plataforma==x }}>{{ x }}</option>{% endfor %}</select></div>
+<div><label>Marca</label><select name="marca"><option value="">Todas</option>{% for m in marcas %}<option {{ 'selected' if f.marca==m }}>{{ m }}</option>{% endfor %}</select></div>
+<button>Filtrar</button></form>
+{% if not ops %}<p class="suave">No hay oportunidades con estos filtros. La corrida diaria las irá agregando.</p>{% else %}
+<div class="envoltura"><table><tr><th>Artículo</th><th>Tipo</th><th class="n">Pedido</th><th class="n">Apertura</th><th class="n">Techo</th>
+<th class="n">EE. UU. usado</th><th class="n">Colombia</th><th class="n">Margen</th><th class="n">Puntaje</th></tr>
+{% for o in ops %}<tr>
+<td><a href="/oportunidad/{{ o.id }}">{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</a><br><span class="suave">{{ o.listing.plataforma }} · {{ o.normalizado.estado }}{% if o.banderas %} · <span class="aviso">revisar</span>{% endif %}</span></td>
+<td><span class="et {{ o.tipo }}">{{ o.tipo }}</span></td>
+<td class="n">{{ o.listing.precio_usd|usd }}</td><td class="n">{{ o.oferta.apertura_usd|usd }}</td><td class="n">{{ o.oferta.techo_usd|usd }}</td>
+<td class="n">{{ o.valoracion_us.mediana_usd|usd }}</td>
+<td class="n">{% if o.precio_co_cop is defined %}{{ o.precio_co_cop|cop }}{% else %}<span class="suave">sin referencia</span>{% endif %}</td>
+<td class="n">{% if o.margen_en_retiro is defined %}{{ o.margen_en_retiro|pct }}{% else %}−{{ o.descuento_us|pct }} vs EE. UU.{% endif %}</td>
+<td class="n">{{ '%.2f'|format(o.puntaje) }}</td></tr>{% endfor %}</table></div>{% endif %}
+{% endblock %}

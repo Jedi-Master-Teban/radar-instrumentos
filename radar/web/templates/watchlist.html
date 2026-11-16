@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block cuerpo %}
+<h1>Lista de seguimiento</h1>
+<table><tr><th>Categoría</th><th>Marca</th><th>Búsqueda</th><th></th></tr>
+{% for w in items %}<tr><td>{{ w.categoria }}</td><td>{{ w.marca }}</td><td>{{ w.consulta }}</td>
+<td><form method="post" action="/watchlist/{{ w.id }}/activo"><button>{{ 'Pausar' if w.activo else 'Activar' }}</button></form></td></tr>{% endfor %}</table>
+<h2>Agregar búsqueda</h2>
+<form class="fila" method="post" action="/watchlist"><div><label>Categoría</label><select name="categoria"><option>guitarra</option><option>bajo</option><option>pedal</option><option>cuerdas</option></select></div>
+<div><label>Marca</label><input name="marca" required></div><div><label>Búsqueda (en inglés)</label><input name="consulta" required></div><button>Agregar</button></form>
+<h2>Precio de referencia manual en Colombia</h2><p class="suave">Tu valor manda sobre el automático para ese modelo.</p>
+<form class="fila" method="post" action="/referencia"><div><label>Marca</label><input name="marca" required></div><div><label>Modelo</label><input name="modelo" required></div>
+<div><label>Precio de venta usado (COP)</label><input name="usado_cop" type="number" min="1" required></div><button>Fijar</button></form>
+<table><tr><th>Marca</th><th>Modelo</th><th class="n">Usado</th><th class="n">Nuevo</th><th>Fecha</th><th>Origen</th></tr>
+{% for r in refs %}<tr><td>{{ r.marca }}</td><td>{{ r.modelo }}</td><td class="n">{{ r.usado_cop|cop }}</td><td class="n">{{ r.nuevo_cop|cop }}</td><td>{{ r.fecha }}</td><td>{{ 'manual' if r.manual else 'automático' }}</td></tr>{% endfor %}</table>
+{% endblock %}

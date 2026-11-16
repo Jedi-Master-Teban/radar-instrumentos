@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block cuerpo %}
+<h1>Eventos</h1><table><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th></tr>
+{% for e in eventos %}<tr><td>{{ e.fecha }}</td><td>{{ e.tipo }}</td><td>{{ e.detalle }}</td></tr>{% else %}<tr><td class="suave">Sin eventos.</td></tr>{% endfor %}</table>
+{% endblock %}

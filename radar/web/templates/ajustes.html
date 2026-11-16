@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block cuerpo %}
+<h1>Ajustes</h1><p class="suave">Las claves se guardan en tu equipo, en ~/.radar/.env, y no se muestran de nuevo. Deja un campo vacío para conservar su valor.</p>
+<form method="post"><div class="rejilla">
+<div><label>Clave de NVIDIA NIM — {{ 'configurada' if nim else 'falta' }}</label><input name="nim_api_key" type="password" autocomplete="off"></div>
+<div><label>Modelo de NIM</label><input name="nim_model" value="{{ modelo }}" placeholder="meta/llama-3.3-70b-instruct"></div>
+<div><label>Token del bot de Telegram — {{ 'configurado' if tg else 'falta' }}</label><input name="telegram_bot_token" type="password" autocomplete="off"></div>
+<div><label>ID del chat de Telegram</label><input name="telegram_chat_id" value="{{ chat }}"></div>
+</div><p><button>Guardar</button></p></form>
+<h2>Sesión de Facebook y MercadoLibre</h2>
+<p>{{ 'Hay un perfil guardado.' if perfil else 'No hay sesión guardada: Facebook y MercadoLibre se omiten.' }} Para iniciar o renovar la sesión ejecuta <code>python scripts/login_facebook.py</code> en la terminal. La contraseña nunca pasa por esta herramienta.</p>
+{% endblock %}

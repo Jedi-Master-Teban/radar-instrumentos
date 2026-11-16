@@ -29,7 +29,14 @@ PARAMETROS_DEFECTO: dict = {
     "min_comparables_us": 3,
     "max_normalizar_dia": 200,
     "trm_manual": None,
-    "ciudades_fb": ["miami", "houston", "dallas", "atlanta", "nyc", "la"],
+    "ciudades_fb": ["miami", "nyc"],
+    "tiendas_co": [
+        {"nombre": "Ortizo", "origen": "https://ortizo.com.co", "plataforma": "shopify"},
+        {"nombre": "La Colonial", "origen": "https://www.lacolonial.com.co", "plataforma": "shopify"},
+        {"nombre": "TMS Music", "origen": "https://tmsmusic.co", "plataforma": "shopify"},
+        {"nombre": "Music Head Store", "origen": "https://musicheadstore.com", "plataforma": "woocommerce"},
+        {"nombre": "Duosonic", "origen": "https://duosonic.co", "plataforma": "woocommerce"},
+    ],
 }
 
 WATCHLIST_SEMILLA = [

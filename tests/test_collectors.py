@@ -67,7 +67,7 @@ def test_reverb_respuesta_vacia():
 
 
 # ---------- Tiendas ----------
-ORTIZO = tiendas.TIENDAS_CO_DEFECTO[0]
+ORTIZO = {"nombre": "Ortizo", "origen": "https://ortizo.com.co", "plataforma": "shopify"}
 
 
 def test_shopify():

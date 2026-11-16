@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block titulo %}Radar de instrumentos{% endblock %}</title>
+<style>
+:root{--fondo:#f6f5f1;--tinta:#1d1d1b;--suave:#6b6a65;--linea:#dcdad2;--tarjeta:#fff;--acento:#0b6e4f;--alerta:#a4491a}
+@media (prefers-color-scheme:dark){:root{--fondo:#171716;--tinta:#ecebe6;--suave:#a09f98;--linea:#33322f;--tarjeta:#1f1f1d;--acento:#5ac8a0;--alerta:#f0a070}}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,sans-serif;background:var(--fondo);color:var(--tinta)}
+header{display:flex;gap:1.2rem;align-items:baseline;padding:.9rem 1.2rem;border-bottom:1px solid var(--linea);flex-wrap:wrap}
+header b{font-size:1.05rem}header a{color:var(--suave);text-decoration:none}header a:hover{color:var(--tinta)}
+main{max-width:1150px;margin:0 auto;padding:1.2rem}h1{font-size:1.3rem;margin:.2rem 0 1rem}h2{font-size:1.05rem;margin:1.4rem 0 .5rem}
+table{width:100%;border-collapse:collapse;background:var(--tarjeta);border:1px solid var(--linea)}
+th,td{padding:.5rem .6rem;border-bottom:1px solid var(--linea);text-align:left;vertical-align:top}
+th{font-size:.8rem;color:var(--suave);font-weight:600}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+a{color:var(--acento)}.et{display:inline-block;padding:.05rem .45rem;border-radius:3px;font-size:.78rem;border:1px solid var(--linea)}
+.et.reventa{border-color:var(--acento);color:var(--acento)}.et.ganga{border-color:var(--alerta);color:var(--alerta)}
+.aviso{color:var(--alerta)}.suave{color:var(--suave)}.fila{display:flex;gap:.6rem;flex-wrap:wrap;align-items:end;margin:.6rem 0}
+input,select,textarea,button{font:inherit;padding:.35rem .5rem;border:1px solid var(--linea);background:var(--tarjeta);color:var(--tinta);border-radius:4px}
+button{background:var(--acento);color:#fff;border-color:var(--acento);cursor:pointer}label{display:block;font-size:.8rem;color:var(--suave)}
+.rejilla{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:.8rem}.tarjeta{background:var(--tarjeta);border:1px solid var(--linea);padding:.8rem;border-radius:4px}
+pre{white-space:pre-wrap;background:var(--tarjeta);border:1px solid var(--linea);padding:.7rem;border-radius:4px}img.foto{max-width:260px;border-radius:4px}
+.envoltura{overflow-x:auto}
+</style></head><body>
+<header><b>Radar de instrumentos</b><a href="/">Oportunidades</a><a href="/watchlist">Lista de seguimiento</a>
+<a href="/parametros">Parámetros</a><a href="/ajustes">Ajustes</a><a href="/eventos">Eventos</a></header>
+<main>{% block cuerpo %}{% endblock %}</main></body></html>

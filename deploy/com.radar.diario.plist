@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Corrida diaria a las 7:00. Reemplaza RUTA_DEL_PROYECTO y copia a ~/Library/LaunchAgents/ (ver README). -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.radar.diario</string>
+  <key>WorkingDirectory</key><string>RUTA_DEL_PROYECTO</string>
+  <key>ProgramArguments</key><array>
+    <string>RUTA_DEL_PROYECTO/.venv/bin/python</string><string>-m</string><string>radar</string><string>correr</string>
+  </array>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+  <key>StandardOutPath</key><string>/tmp/radar.log</string>
+  <key>StandardErrorPath</key><string>/tmp/radar.log</string>
+</dict></plist>
