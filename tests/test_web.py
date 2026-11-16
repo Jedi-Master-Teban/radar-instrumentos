@@ -25,14 +25,14 @@ def cliente(tmp_path, monkeypatch):
     correr(con, {"facebook": lambda c: [listing(800, id_externo="F9", plataforma="facebook", titulo="Strandberg Boden Plini")]},
            {"r": us(usado=1900, nuevo=2600)}, {"m": Contador([])}, ModeloFalso(), SinAvisos(), 3270, HOY)
     con.close()
-    return TestClient(crear_app(aj)), aj
+    return TestClient(crear_app(aj, carpeta_capturas=tmp_path / 'capturas')), aj
 
 
 def test_lista_muestra_reventa_y_ganga(cliente):
     c, _ = cliente
     r = c.get("/")
     assert r.status_code == 200 and "Fender Player Stratocaster" in r.text and "Strandberg Boden Plini" in r.text
-    assert "sin referencia" in r.text
+    assert "no está" in r.text and "Reventa con margen" in r.text and "Ganga (no está en Colombia)" in r.text
 
 
 def test_filtro_por_tipo(cliente):
@@ -113,9 +113,9 @@ def test_corrida_desde_el_tablero(tmp_path, monkeypatch):
         vivos.add(4242)
         (a.home / "corrida.log").write_text("ebay: 12 publicaciones\n")
         return 4242
-    c = TestClient(crear_app(aj, lanzar=lanzar, vivo=lambda pid: pid in vivos))
-    assert "ninguna corrida" in c.get("/").text  # lista vacía explica qué hacer
-    assert "Aún no hay registro" in c.get("/corrida").text
+    c = TestClient(crear_app(aj, lanzar=lanzar, vivo=lambda pid: pid in vivos, carpeta_capturas=tmp_path / 'capturas'))
+    assert "Todavía no hay datos" in c.get("/").text  # lista vacía explica qué hacer
+    assert "Aún no hay corridas" in c.get("/corrida").text
     assert c.post("/corrida", data={"modo": "prueba"}, follow_redirects=False).status_code == 303
     t = c.get("/corrida").text
     assert "corrida en curso" in t and "ebay: 12 publicaciones" in t
@@ -135,3 +135,26 @@ def test_proceso_terminado_no_cuenta_como_corrida_activa():
     proc = subprocess.Popen([sys.executable, "-c", "pass"])
     time.sleep(0.5)  # ya terminó, pero nadie lo ha recogido: antes se veía como "en curso"
     assert _vivo(proc.pid) is False
+
+
+def test_tablero_importa_capturas_del_repo_al_abrir(tmp_path, monkeypatch):
+    import json as js
+
+    monkeypatch.setenv("RADAR_HOME", str(tmp_path))
+    aj = config.cargar(None)
+    con = db.conectar(aj.ruta_db)
+    db.set_parametro(con, "trm_manual", 3316.7)  # sin red en las pruebas
+    con.close()
+    carpeta = tmp_path / "capturas"
+    carpeta.mkdir()
+    pubs = [{"id": str(i), "titulo": f"Strandberg Boden Prog NX 6 #{i}", "url": f"https://reverb.com/item/{i}",
+             "precio_usd": pr, "marca": "Strandberg", "modelo": "Boden Prog NX 6", "estado": "excellent"}
+            for i, pr in enumerate([1000, 1650, 1700, 1750])]
+    pubs.append({"id": "9", "titulo": "Strandberg Boden Neck-Thru 6 #a", "url": "https://reverb.com/item/9", "precio_usd": 1700,
+                 "marca": "Strandberg", "modelo": "Boden Prog NX 6", "estado": "good"})
+    (carpeta / "a.json").write_text(js.dumps({"fuente": "reverb", "publicaciones": pubs}))
+    c = TestClient(crear_app(aj, carpeta_capturas=carpeta))
+    t = c.get("/").text
+    assert "Guitarras" in t and 'href="https://reverb.com/item/0"' in t and "Ganga (no está en Colombia)" in t
+    assert "A precio de mercado" in t and "neck-thru" in t and "capturas importadas" in c.get("/corrida").text
+    assert "Solo oportunidades" in t and "NX 6 #1" not in c.get("/?ver=oportunidades").text

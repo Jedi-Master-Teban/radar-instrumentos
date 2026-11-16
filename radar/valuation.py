@@ -83,12 +83,13 @@ def _vigente(fecha_iso: str, hoy: date, dias: int) -> bool:
     return (hoy - date.fromisoformat(fecha_iso)).days < dias
 
 
-def referencia_us(con, fuentes_us: dict, modelo, n: Normalizado, hoy: date) -> tuple[ValoracionUS | None, list[dict]]:
+def referencia_us(con, fuentes_us: dict, modelo, n: Normalizado, hoy: date,
+                  usar_cache: bool = True) -> tuple[ValoracionUS | None, list[dict]]:
     """fuentes_us: nombre -> callable(consulta, condicion) -> list[PrecioTienda]."""
     p = db.parametros(con)
     fila = con.execute("select datos, fecha, detalle from referencias_us where marca=? and modelo=?",
                        (n.marca, n.modelo)).fetchone()
-    if fila and _vigente(fila["fecha"], hoy, p["cache_us_dias"]):
+    if usar_cache and fila and _vigente(fila["fecha"], hoy, p["cache_us_dias"]):
         d = json.loads(fila["datos"])
         return (ValoracionUS(**d) if d else None), json.loads(fila["detalle"] or "[]")
     consulta = f"{n.marca} {n.modelo}"

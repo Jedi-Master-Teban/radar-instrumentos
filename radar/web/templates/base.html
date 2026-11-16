@@ -19,7 +19,17 @@ button{background:var(--acento);color:#fff;border-color:var(--acento);cursor:poi
 .rejilla{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:.8rem}.tarjeta{background:var(--tarjeta);border:1px solid var(--linea);padding:.8rem;border-radius:4px}
 pre{white-space:pre-wrap;background:var(--tarjeta);border:1px solid var(--linea);padding:.7rem;border-radius:4px}img.foto{max-width:260px;border-radius:4px}
 .envoltura{overflow-x:auto}
+.cifras{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem;margin:0 0 1.1rem}
+.cifra{background:var(--tarjeta);border:1px solid var(--linea);border-radius:6px;padding:.7rem .9rem}
+.cifra b{display:block;font-size:1.6rem;line-height:1.1;font-variant-numeric:tabular-nums}.cifra span{font-size:.8rem;color:var(--suave)}
+.cifra.si b{color:var(--acento)}.cifra.ojo b{color:var(--alerta)}
+.et.observacion{color:var(--suave)}.et.pri{border-color:var(--alerta);color:var(--alerta)}
+td small,th small{display:block;color:var(--suave);font-size:.78rem;font-weight:400}
+td .tit{font-weight:600;text-decoration:none}td .tit:hover{text-decoration:underline}
+.pos{color:var(--acento);font-weight:600}.neg{color:var(--suave)}
+.barra{height:8px;background:var(--linea);border-radius:4px;overflow:hidden;max-width:420px}.barra i{display:block;height:100%;background:var(--acento)}
+details{margin-top:1rem}summary{cursor:pointer;color:var(--suave)}tr.op td{background:color-mix(in srgb,var(--acento) 6%,var(--tarjeta))}
 </style></head><body>
-<header><b>Radar de instrumentos</b><a href="/">Oportunidades</a><a href="/corrida">Correr</a><a href="/watchlist">Lista de seguimiento</a>
+<header><b>Radar de instrumentos</b><a href="/">Publicaciones</a><a href="/corrida">Estado</a><a href="/watchlist">Lista de seguimiento</a>
 <a href="/parametros">Parámetros</a><a href="/ajustes">Ajustes</a><a href="/eventos">Eventos</a></header>
 <main>{% block cuerpo %}{% endblock %}</main></body></html>

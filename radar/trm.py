@@ -27,3 +27,18 @@ def trm_hoy(con, cliente: httpx.Client | None = None) -> float:
     finally:
         if propio:
             cliente.close()
+
+
+def trm_del_dia(con, hoy, cliente: httpx.Client | None = None) -> float:
+    """TRM guardada por día, para no consultar la red en cada visita al tablero."""
+    guardada = db.parametros(con).get("trm_cache") or {}
+    if guardada.get("fecha") == hoy.isoformat():
+        return float(guardada["valor"])
+    try:
+        valor = trm_hoy(con, cliente)
+    except RuntimeError:
+        if guardada.get("valor"):
+            return float(guardada["valor"])
+        raise
+    db.set_parametro(con, "trm_cache", {"fecha": hoy.isoformat(), "valor": valor})
+    return valor

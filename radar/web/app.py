@@ -56,7 +56,7 @@ def _vivo(pid: int) -> bool:
         return False
 
 
-def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo) -> FastAPI:
+def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo, carpeta_capturas=None) -> FastAPI:
     app = FastAPI(title="Radar de instrumentos", docs_url=None, redoc_url=None)
 
     def corrida_activa() -> bool:
@@ -70,8 +70,34 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo) -> FastAPI
     def ver_corrida(request: Request):
         ruta = aj.home / "corrida.log"
         registro = "\n".join(ruta.read_text(errors="replace").splitlines()[-120:]) if ruta.exists() else ""
+        c = con()
+        ult = c.execute("select id, fecha, tipo, detalle from eventos where tipo in ('corrida', 'importacion') "
+                        "order by id desc limit 1").fetchone()
+        resumen, problemas = None, []
+        if ult:
+            try:
+                resumen = json.loads(ult["detalle"]) | {"fecha": ult["fecha"], "origen": ult["tipo"]}
+            except ValueError:
+                resumen = None
+            previa = c.execute("select coalesce(max(id), 0) from eventos where tipo in ('corrida', 'importacion') "
+                               "and id < ?", (ult["id"],)).fetchone()[0]
+            vistos = set()
+            for e in c.execute("select tipo, detalle from eventos where id > ? and id < ? and tipo in "
+                               "('lector_bloqueado', 'lector_error', 'lector_sin_resultados', "
+                               "'modelo_respuesta_invalida', 'telegram_error')", (previa, ult["id"])):
+                fuente = e["detalle"].split(":")[0][:40]
+                if (e["tipo"], fuente) not in vistos:
+                    vistos.add((e["tipo"], fuente))
+                    problemas.append({"tipo": e["tipo"], "fuente": fuente})
+        avance = None
+        if registro:
+            import re
+            m = re.findall(r"^\[(\d+)/(\d+)\]", registro, flags=re.M)
+            if m:
+                avance = (int(m[-1][0]), int(m[-1][1]))
         return PLANTILLAS.TemplateResponse(request, "corrida.html", {
-            "activa": corrida_activa(), "registro": registro, "nim": bool(config.cargar(None).nim_api_key)})
+            "activa": corrida_activa(), "registro": registro, "nim": bool(config.cargar(None).nim_api_key),
+            "resumen": resumen, "problemas": problemas, "avance": avance})
 
     @app.post("/corrida")
     def iniciar_corrida(modo: str = Form("prueba")):
@@ -103,24 +129,63 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo) -> FastAPI
             raise HTTPException(404, "Oportunidad no encontrada")
         return f
 
+    def _importar_capturas(c) -> None:
+        """Si hay capturas nuevas en datos/capturas/, las evalúa antes de mostrar la lista."""
+        from ..capturas import CARPETA, importar
+        from ..trm import trm_del_dia
+
+        carpeta = carpeta_capturas or CARPETA
+        try:
+            if not any(carpeta.glob("*.json")):
+                return
+            hoy = date.today()
+            importar(c, carpeta, trm_del_dia(c, hoy), hoy)
+        except Exception as e:  # el tablero nunca debe caerse por una captura
+            db.evento(c, "importacion_error", f"{type(e).__name__}: {e}")
+
+    ORDEN_TIPO = {"reventa": 0, "ganga": 1, "observacion": 2}
+    NOMBRE_CATEGORIA = {"guitarra": "Guitarras", "bajo": "Bajos", "pedal": "Pedales", "cuerdas": "Cuerdas"}
+
     @app.get("/", response_class=HTMLResponse)
-    def lista(request: Request, plataforma: str = "", marca: str = "", tipo: str = "", estado: str = "nueva"):
+    def lista(request: Request, plataforma: str = "", marca: str = "", tipo: str = "", estado: str = "nueva",
+              ver: str = "todas"):
         c = con()
-        ops = []
-        for f in c.execute("select * from oportunidades order by puntaje desc"):
+        _importar_capturas(c)
+        ops, todas = [], []
+        for f in c.execute("select * from oportunidades"):
             d = json.loads(f["datos"])
+            o = {"id": f["id"], "tipo": f["tipo"], "puntaje": f["puntaje"], "estado": f["estado"], **d}
+            todas.append(o)
             if plataforma and d["listing"]["plataforma"] != plataforma:
                 continue
             if marca and d["normalizado"]["marca"].lower() != marca.lower():
                 continue
             if tipo and f["tipo"] != tipo or estado and f["estado"] != estado:
                 continue
-            ops.append({"id": f["id"], "tipo": f["tipo"], "puntaje": f["puntaje"], "estado": f["estado"], **d})
-        marcas = sorted({json.loads(r[0])["normalizado"]["marca"] for r in c.execute("select datos from oportunidades")})
+            if ver == "oportunidades" and f["tipo"] == "observacion":
+                continue
+            ops.append(o)
+        ops.sort(key=lambda o: (ORDEN_TIPO.get(o["tipo"], 9), -o["puntaje"], -bool(o.get("prioritario")),
+                                o.get("descuento_us") is None, -(o.get("descuento_us") or 0)))
+        grupos = [(NOMBRE_CATEGORIA[cat], [o for o in ops if o["normalizado"]["categoria"] == cat])
+                  for cat in NOMBRE_CATEGORIA]
+        vivas = [o for o in todas if o["estado"] == "nueva"]
+        resumen = {
+            "reventa": sum(o["tipo"] == "reventa" for o in vivas),
+            "ganga": sum(o["tipo"] == "ganga" for o in vivas),
+            "bajo": sum(o["tipo"] == "observacion" and (o.get("descuento_us") or 0) >= 0.10 for o in vivas),
+            "evaluadas": len(vivas),
+            "prioritarias": sum(bool(o.get("prioritario")) for o in vivas),
+        }
+        ultima = c.execute("select fecha from eventos where tipo in ('corrida', 'importacion') "
+                           "order by id desc limit 1").fetchone()
         return PLANTILLAS.TemplateResponse(request, "lista.html", {
-            "ops": ops, "marcas": marcas, "f": dict(plataforma=plataforma, marca=marca, tipo=tipo, estado=estado),
-            "estados": ESTADOS_OPORTUNIDAD,
-            "corridas": c.execute("select count(*) from eventos where tipo='corrida'").fetchone()[0]})
+            "grupos": [g for g in grupos if g[1]], "total": len(ops), "resumen": resumen,
+            "marcas": sorted({o["normalizado"]["marca"] for o in todas}),
+            "plataformas": sorted({o["listing"]["plataforma"] for o in todas}),
+            "f": dict(plataforma=plataforma, marca=marca, tipo=tipo, estado=estado, ver=ver),
+            "estados": ESTADOS_OPORTUNIDAD, "ultima": ultima["fecha"] if ultima else None,
+            "corridas": c.execute("select count(*) from eventos where tipo in ('corrida', 'importacion')").fetchone()[0]})
 
     @app.get("/oportunidad/{oid}", response_class=HTMLResponse)
     def detalle(request: Request, oid: int):

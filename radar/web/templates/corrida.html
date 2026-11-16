@@ -1,12 +1,25 @@
 {% extends "base.html" %}{% block cuerpo %}
 {% if activa %}<meta http-equiv="refresh" content="6">{% endif %}
-<h1>Correr el radar</h1>
-{% if not nim %}<p class="aviso">Falta la clave de NVIDIA NIM: guárdala en <a href="/ajustes">Ajustes</a> antes de correr.</p>{% endif %}
-{% if activa %}<p><b>Hay una corrida en curso.</b> Esta página se actualiza sola.</p>
-{% else %}<form class="fila" method="post" action="/corrida">
-<button name="modo" value="prueba">Corrida de prueba</button><span class="suave">1 búsqueda, 12 publicaciones por sitio; unos minutos.</span></form>
-<form class="fila" method="post" action="/corrida">
-<button name="modo" value="completa">Corrida completa</button><span class="suave">Toda la lista de seguimiento; puede tardar más de una hora.</span></form>{% endif %}
-<h2>Registro de la última corrida</h2>
-{% if registro %}<pre>{{ registro }}</pre>{% else %}<p class="suave">Aún no hay registro.</p>{% endif %}
+<h1>Estado del radar</h1>
+{% if activa %}<p><b>Hay una corrida en curso.</b>{% if avance %} Va en la publicación {{ avance[0] }} de {{ avance[1] }}.{% endif %} Esta página se actualiza sola.</p>
+{% if avance %}<div class="barra"><i style="width:{{ (100 * avance[0] / avance[1])|round|int }}%"></i></div>{% endif %}{% endif %}
+{% if resumen %}
+<h2>Última actualización <span class="suave">· {{ resumen.fecha[:16]|replace('T', ' ') }} · {{ 'capturas importadas' if resumen.origen == 'importacion' else 'corrida' }}</span></h2>
+<div class="cifras">
+<div class="cifra"><b>{{ resumen.listings }}</b><span>Publicaciones leídas</span></div>
+<div class="cifra"><b>{{ resumen.nuevos_o_rebajados }}</b><span>Evaluadas</span></div>
+<div class="cifra si"><b>{{ resumen.oportunidades }}</b><span>Oportunidades</span></div>
+<div class="cifra"><b>{{ resumen.detalle.get('sin_margen', 0) }}</b><span>Sin margen ni ganga</span></div>
+<div class="cifra {{ 'ojo' if resumen.detalle.get('sin_valoracion_us', 0) }}"><b>{{ resumen.detalle.get('sin_valoracion_us', 0) }}</b><span>Sin comparables en EE. UU.</span></div>
+<div class="cifra {{ 'ojo' if resumen.detalle.get('sin_normalizar', 0) }}"><b>{{ resumen.detalle.get('sin_normalizar', 0) }}</b><span>El modelo no las identificó</span></div>
+</div>
+{% if problemas %}<h2>Problemas en esa corrida</h2><table><tr><th>Qué pasó</th><th>Dónde</th></tr>
+{% for p in problemas %}<tr><td>{{ {'lector_bloqueado': 'El sitio bloqueó la lectura', 'lector_error': 'Error al leer', 'lector_sin_resultados': 'No devolvió resultados', 'modelo_respuesta_invalida': 'Respuesta inválida del modelo de NIM', 'telegram_error': 'Telegram no aceptó el mensaje'}[p.tipo] }}</td><td>{{ p.fuente }}</td></tr>{% endfor %}</table>{% endif %}
+{% else %}<p class="suave">Aún no hay corridas ni capturas importadas.</p>{% endif %}
+<h2>Lanzar una corrida</h2>
+{% if not nim %}<p class="aviso">Falta la clave de NVIDIA NIM: guárdala en <a href="/ajustes">Ajustes</a>.</p>{% endif %}
+{% if not activa %}<form class="fila" method="post" action="/corrida">
+<button name="modo" value="prueba">Corrida de prueba</button><button name="modo" value="completa">Corrida completa</button>
+<span class="suave">Evalúa con el modelo de NIM lo capturado en ~/.radar/ingesta. Las capturas de <code>datos/capturas/</code> se importan solas al abrir Publicaciones.</span></form>{% endif %}
+{% if registro %}<details><summary>Registro técnico de la última corrida</summary><pre>{{ registro }}</pre></details>{% endif %}
 {% endblock %}

@@ -11,7 +11,7 @@ cd ~/Código/radar-instrumentos
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 playwright install chromium
-pytest -q                      # 95 pruebas, sin red
+pytest -q                      # 110 pruebas, sin red
 python -m radar web            # tablero en http://127.0.0.1:8000
 ```
 
@@ -69,6 +69,12 @@ Todos los porcentajes y topes se editan en **Parámetros**.
 La navegación real con Playwright (`radar/collectors/base.py`) **no se ha ejecutado todavía**: las pruebas usan
 muestras guardadas. La primera corrida real es la verificación pendiente; si un lector devuelve cero
 resultados, recibes el aviso `lector_sin_resultados` y hay que ajustar sus selectores.
+
+## Capturas en el repositorio
+
+`datos/capturas/*.json` guarda publicaciones ya identificadas (marca, modelo, estado) por quien navega; por
+ejemplo, una tarea programada de Claude con el navegador integrado. El tablero las importa al abrir
+**Publicaciones** y las evalúa al instante, sin modelo de lenguaje. El formato está en `datos/README.md`.
 
 ## Ventana del navegador
 

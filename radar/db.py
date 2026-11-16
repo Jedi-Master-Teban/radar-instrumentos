@@ -105,7 +105,7 @@ create table if not exists eventos(id integer primary key, fecha text, tipo text
 
 
 def conectar(ruta: str) -> sqlite3.Connection:
-    con = sqlite3.connect(ruta)
+    con = sqlite3.connect(ruta, timeout=30)
     con.row_factory = sqlite3.Row
     con.executescript(ESQUEMA)
     for clave, valor in PARAMETROS_DEFECTO.items():

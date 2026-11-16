@@ -52,6 +52,13 @@ def _extraer_json(texto: str):
     return None
 
 
+def mensaje_plantilla(n: Normalizado, o: Oferta, val: ValoracionUS) -> str:
+    """Mensaje de oferta fijo: se usa cuando no hay modelo o su respuesta no es fiable."""
+    return (f"Hi! I'm interested in your {n.marca} {n.modelo}. Similar used ones are listed around "
+            f"${val.p25_usd:,.0f}-${val.p75_usd:,.0f}. Would you accept ${o.apertura_usd:,.0f}? "
+            "I can pay right away. Thanks!")
+
+
 class Modelo:
     def __init__(self, cliente=None, modelo: str = "", api_key: str = "", registrar=None):
         if cliente is None:
@@ -121,9 +128,7 @@ class Modelo:
         return [x is True for x in r]
 
     def mensaje_oferta(self, l: Listing, n: Normalizado, o: Oferta, val: ValoracionUS) -> str:
-        respaldo = (f"Hi! I'm interested in your {n.marca} {n.modelo}. Similar used ones are listed around "
-                    f"${val.p25_usd:,.0f}-${val.p75_usd:,.0f}. Would you accept ${o.apertura_usd:,.0f}? "
-                    "I can pay right away. Thanks!")
+        respaldo = mensaje_plantilla(n, o, val)
         usuario = (f"Item: {l.titulo}\nAsking price: ${l.precio_usd:,.0f}\nOffer amount: ${o.apertura_usd:,.0f}\n"
                    f"Comparable used range: ${val.p25_usd:,.0f}-${val.p75_usd:,.0f} ({val.n} listings)\n"
                    f"Defects stated in listing: {', '.join(n.defectos) or 'none'}")
