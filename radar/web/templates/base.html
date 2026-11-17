@@ -43,7 +43,8 @@ a.cifra:hover{border-color:var(--suave)}
 .par{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
 .par>span:first-child{font-size:13px;color:var(--suave)}
 .par>span:last-child{text-align:right;font-variant-numeric:tabular-nums}
-.par small,td small{display:block;font-size:12px;color:var(--suave);font-weight:400}
+.par small,td small,th small{display:block;font-size:12px;color:var(--suave);font-weight:400}
+th small{font-size:11px;opacity:.85}
 .pie-tarjeta{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--linea);padding-top:12px;gap:10px}
 .margen{font-family:var(--titulos);font-size:22px;font-weight:600;color:var(--acento);font-variant-numeric:tabular-nums}
 .margen.neg{color:var(--suave)}
@@ -56,6 +57,7 @@ a.cifra:hover{border-color:var(--suave)}
 .caja{background:var(--sup);border:1px solid var(--linea);border-radius:12px}
 .tabla{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:14px}
+.tabla table{min-width:1080px}.tabla td:first-child{min-width:250px;max-width:320px}
 th{padding:10px 12px;text-align:left;font-size:12px;font-weight:500;color:var(--suave);white-space:nowrap}
 td{padding:11px 12px;border-top:1px solid var(--linea);vertical-align:top}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
