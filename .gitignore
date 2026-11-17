@@ -7,3 +7,4 @@ __pycache__/
 *.egg-info/
 .superpowers/
 _site/
+_to_delete/
