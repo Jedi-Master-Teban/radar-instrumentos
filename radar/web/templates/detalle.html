@@ -50,8 +50,8 @@
 <div class="par"><span>Flete máximo que aún deja {{ dg.mo|pct }}</span><span id="v-fmax">{{ c.flete_max|cop }}</span></div>
 </div>
 <div class="fila">
-<label>Flete real cotizado (COP)<input type="number" id="i-flete" min="0" step="10000" value="{{ (o.flete_real_cop or dg.flete)|round|int }}"></label>
-<label>Tu precio de referencia en Colombia (COP)<input type="number" id="i-ref" min="0" step="50000" value="{{ dg.ref|round|int }}"></label>
+<label>Flete real cotizado (COP)<input type="number" id="i-flete" min="0" step="10000" value="{{ (o.flete_real_cop or dg.flete)|round(-3)|int }}"></label>
+<label>Tu precio de referencia en Colombia (COP)<input type="number" id="i-ref" min="0" step="50000" value="{{ dg.ref|round(-3)|int }}"></label>
 <button type="button" id="b-restaurar">Restaurar</button>
 </div>
 {% if modo == 'local' %}<div class="fila">
@@ -82,7 +82,8 @@
 <script>
 (function(){
   var $ = function(id){ return document.getElementById(id); };
-  function cop(x){ return '$' + Math.round(x).toLocaleString('es-CO'); }
+  function mil(x){ return Math.round(x / 1000) * 1000; }
+  function cop(x){ return '$' + mil(x).toLocaleString('es-CO'); }
   function usd(x){ return 'US$' + Math.round(x).toLocaleString('en-US'); }
   function pct(x){ return Math.round(x * 100) + ' %'; }
   var b = $('b-copiar');
@@ -143,7 +144,7 @@
     if ($('h-ref')) $('h-ref').value = Math.round(ref);
   }
   $('i-flete').addEventListener('input', pintar); $('i-ref').addEventListener('input', pintar);
-  $('b-restaurar').addEventListener('click', function(){ $('i-flete').value = Math.round(d.flete); $('i-ref').value = Math.round(d.ref); pintar(); });
+  $('b-restaurar').addEventListener('click', function(){ $('i-flete').value = mil(d.flete); $('i-ref').value = mil(d.ref); pintar(); });
   pintar();
 })();
 </script>
