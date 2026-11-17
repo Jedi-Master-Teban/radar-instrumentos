@@ -64,3 +64,19 @@ def test_publicacion_repetida_en_dos_capturas_cuenta_una_vez(con, tmp_path):
 def test_comando_captura_responde(capsys):
     from radar.__main__ import main
     assert main(["radar", "captura"]) == 1 and "armar" in capsys.readouterr().out
+
+
+def test_captura_vieja_no_se_muestra_y_precios_usados_cuentan(con, tmp_path):
+    carpeta = tmp_path / "capturas"
+    carpeta.mkdir()
+    pub = {"id": "e1", "fuente": "ebay", "titulo": "Gibson Les Paul Studio", "url": "https://www.ebay.com/itm/e1", "precio_usd": 900,
+           "marca": "Gibson", "modelo": "Les Paul Studio", "estado": "bueno"}
+    usados = [{"marca": "Gibson", "modelo": "Les Paul Studio", "precio_usd": p} for p in (1300, 1350, 1400)]
+    (carpeta / "vieja.json").write_text(json.dumps({"fuente": "reverb", "capturado": "2026-10-01", "publicaciones": [pub]}))
+    (carpeta / "nueva.json").write_text(json.dumps({"fuente": "reverb", "capturado": "2026-11-16", "publicaciones": [pub | {"id": "e2"}],
+                                                    "precios_usados": usados}))
+    importar(con, carpeta, 3316.7, HOY)
+    filas = con.execute("select plataforma, id_externo from listings").fetchall()
+    assert [tuple(f) for f in filas] == [("ebay", "e2")]  # la de octubre ya no aparece; la fuente por publicación manda
+    d = json.loads(con.execute("select datos from oportunidades").fetchone()[0])
+    assert d["valoracion_us"]["n"] == 4 and d["listing"]["plataforma"] == "ebay"

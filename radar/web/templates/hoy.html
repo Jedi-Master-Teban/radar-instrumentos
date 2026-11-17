@@ -11,6 +11,7 @@
 <a class="cifra" href="{{ e('explorar') }}"><b>{{ resumen.evaluadas }}</b><span>Publicaciones evaluadas</span></a>
 </section>
 
+{% if modo != 'local' %}<p class="suave pequeno" style="margin:0">Se actualiza solo cada día a las 6:54 a. m. · <a href="{{ e('estado') }}#actualizar">Actualizar ahora</a></p>{% endif %}
 <section class="seccion">
 <div class="seccion-cab"><h2>Para mirar hoy</h2><span class="suave pequeno">Primero las de margen, luego gangas, posibles reventas y neck-thru</span></div>
 {% if destacadas %}<div class="tarjetas">{% for o in destacadas %}{{ m.tarjeta(o, e) }}{% endfor %}</div>

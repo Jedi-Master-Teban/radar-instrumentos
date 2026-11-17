@@ -3,6 +3,13 @@
 {% block cuerpo %}
 {% if activa_corrida %}<meta http-equiv="refresh" content="6">{% endif %}
 <h1>Estado del radar</h1>
+{% if modo != 'local' %}<section class="caja bloque" id="actualizar"><h2>Actualizar</h2>
+<p style="margin:0">Las publicaciones nuevas se capturan solas todos los días a las 6:54 a. m. (hora de Bogotá); el sitio queda listo unos minutos después. Para forzar una actualización:</p>
+<div class="rejilla">
+<div class="pares"><b>Buscar publicaciones nuevas</b><span class="suave pequeno">Lo hace Claude con el navegador de tu MacBook, así que no se puede lanzar desde esta página. En la app de Claude, abre la tarea programada "Capturas del radar de instrumentos" y ejecútala; tu computador debe estar encendido con la app abierta.</span></div>
+<div class="pares"><b>Recalcular con la TRM y las tiendas de hoy</b><span class="suave pequeno">Vuelve a armar el sitio con las mismas publicaciones. En GitHub, pulsa "Run workflow".</span>
+<div><a class="boton prim" href="https://github.com/{{ repo }}/actions/workflows/sitio.yml" target="_blank" rel="noopener">Recalcular en GitHub</a></div></div>
+</div></section>{% endif %}
 {% if activa_corrida %}<div class="caja bloque"><b>Hay una corrida en curso.</b>{% if avance %}<span class="suave">Va en la publicación {{ avance[0] }} de {{ avance[1] }}. Esta página se actualiza sola.</span>
 <div class="progreso"><i style="width:{{ (100 * avance[0] / avance[1])|round|int }}%"></i></div>{% endif %}</div>{% endif %}
 

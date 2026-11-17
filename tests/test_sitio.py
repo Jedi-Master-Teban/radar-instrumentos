@@ -37,7 +37,8 @@ def test_construir_escribe_todas_las_paginas(tmp_path):
     assert "Seguimiento" not in hoy  # las pantallas locales no se publican
     est = (salida / "estado.html").read_text()
     assert "2026-11-16-reverb-strandberg.json" in est and "datos/parametros.json" in est
-    assert "Corrida completa" not in est
+    assert "Corrida completa" not in est and "github.com/dueno/radar/actions/workflows/sitio.yml" in est
+    assert 'href="estado.html#actualizar"' in hoy
 
 
 def test_referencia_propia_del_repo_manda(tmp_path):

@@ -195,9 +195,25 @@ class ModeloPorPalabras:
 
         return set(re.findall(r"[a-z0-9]+", _sin_tildes(t)))
 
+    @staticmethod
+    def _lista(t: str) -> list[str]:
+        import re
+
+        return re.findall(r"[a-z0-9]+", _sin_tildes(t))
+
     def mismo_articulo(self, objetivo: Normalizado, candidatos: list[str]) -> list[bool]:
-        necesarias = self._fichas(f"{objetivo.marca} {objetivo.modelo}")
-        return [necesarias <= self._fichas(c) for c in candidatos]
+        """La marca puede ir en cualquier parte; las palabras del modelo deben ir seguidas y en orden.
+
+        Así "Player Stratocaster HSS Plus Top" no se confunde con "Player Plus Stratocaster HSS",
+        ni "Les Paul Studio" con "Les Paul Modern Studio".
+        """
+        marca = self._fichas(objetivo.marca)
+        modelo = self._lista(objetivo.modelo)
+        n = len(modelo)
+
+        def seguidas(palabras: list[str]) -> bool:
+            return any(palabras[i:i + n] == modelo for i in range(len(palabras) - n + 1))
+        return [marca <= self._fichas(c) and seguidas(self._lista(c)) for c in candidatos]
 
 
 def actualizar_colombia(con, fuentes_co: dict, hoy: date, log=lambda m: None) -> dict:

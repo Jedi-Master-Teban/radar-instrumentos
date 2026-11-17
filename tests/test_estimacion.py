@@ -63,3 +63,13 @@ def test_actualizar_colombia_consulta_cada_modelo_y_fuerza_reimportar(con):
     assert r == {"modelos": 2, "con_precio_en_colombia": 1} and tienda.llamadas == 2
     assert con.execute("select nuevo_cop from referencias_co where modelo='Les Paul Studio'").fetchone()[0] == 9_330_000
     assert db.parametros(con)["capturas_importadas"] == {}
+
+
+def test_modelo_por_palabras_respeta_el_orden():
+    m = ModeloPorPalabras()
+    objetivo = Normalizado("Fender", "Player Stratocaster HSS Plus Top", "guitarra", "bueno")
+    assert m.mismo_articulo(objetivo, ["Guitarra Fender Player Plus Stratocaster HSS Tequila Sunrise",
+                                       "Fender Player Stratocaster HSS Plus Top Tobacco Burst"]) == [False, True]
+
+    assert m.mismo_articulo(Normalizado("Gibson", "Les Paul Studio", "guitarra", "bueno"),
+                            ["Gibson Les Paul Modern Studio Electric Guitar", "Guitarra Gibson Les Paul Studio Ebony"]) == [False, True]

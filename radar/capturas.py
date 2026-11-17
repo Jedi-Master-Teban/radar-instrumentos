@@ -62,7 +62,7 @@ def leer_captura(ruta: Path) -> tuple[list[tuple[Listing, Normalizado]], list[Pr
             marca, modelo, precio = str(x["marca"]).strip(), str(x["modelo"]).strip(), float(x["precio_usd"])
             if not marca or not modelo or precio <= 0 or categoria not in CATEGORIAS:
                 continue
-            l = Listing(plataforma=fuente, id_externo=str(x["id"]), url=str(x["url"]), titulo=str(x["titulo"]).strip(),
+            l = Listing(plataforma=str(x.get("fuente") or fuente), id_externo=str(x["id"]), url=str(x["url"]), titulo=str(x["titulo"]).strip(),
                         precio_usd=precio, descripcion=str(x.get("descripcion", "")),
                         envio_us_usd=float(x.get("envio_usd") or 0), acepta_ofertas=bool(x.get("ofertas")),
                         hace_envios=x.get("envia", True) is not False,
@@ -74,6 +74,12 @@ def leer_captura(ruta: Path) -> tuple[list[tuple[Listing, Normalizado]], list[Pr
             continue
         pares.append((l, n))
         precios.append(PrecioTienda(fuente, f"{marca} {modelo}", precio, "usado", l.url))
+    for x in d.get("precios_usados", []):  # comparables sin publicación propia (precios pedidos de usadas)
+        try:
+            precios.append(PrecioTienda(str(x.get("fuente", fuente)), f"{str(x['marca']).strip()} {str(x['modelo']).strip()}",
+                                        float(x["precio_usd"]), "usado", str(x.get("url", ""))))
+        except (KeyError, TypeError, ValueError):
+            continue
     for x in d.get("precios_nuevos", []):
         try:
             precios.append(PrecioTienda(fuente, f"{str(x['marca']).strip()} {str(x['modelo']).strip()}",
@@ -101,9 +107,16 @@ def importar(con, carpeta: Path, trm: float, hoy: date, forzar: bool = False) ->
         return None
     modelo, fuente = ModeloCaptura(), FuenteCapturas()
     leidos = []
+    vigencia = int(db.parametros(con).get("dias_vigencia_captura", 14))
     for a in archivos:  # se leen todas: los comparables salen del conjunto completo
+        fecha = _fecha_captura(a)
         try:
-            leidos.append((_fecha_captura(a), a.name, *leer_captura(a)))
+            if fecha and (hoy - date.fromisoformat(fecha)).days > vigencia:
+                continue  # captura vieja: sus publicaciones probablemente ya se vendieron
+        except ValueError:
+            pass
+        try:
+            leidos.append((fecha, a.name, *leer_captura(a)))
         except (OSError, ValueError) as e:
             db.evento(con, "captura_invalida", f"{a.name}: {e}")
     # Si una publicación aparece en varias capturas, cuenta una sola vez: la de la captura más reciente.
