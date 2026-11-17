@@ -1,0 +1,11 @@
+{
+  "_nota": "Búsquedas de la captura diaria en Reverb (solo vendedores en EE. UU., usadas, que envían). Edita esta lista desde GitHub; la tarea programada la lee cada mañana. paginas: 1 página = hasta 50 publicaciones.",
+  "busquedas": [
+    {"slug": "strandberg", "consulta": "strandberg", "categoria": "guitarra", "precio_max": 3500, "paginas": 2},
+    {"slug": "gibson-les-paul-studio", "consulta": "gibson les paul studio", "categoria": "guitarra", "precio_max": 3500, "paginas": 1},
+    {"slug": "fender-american-professional-ii-stratocaster", "consulta": "fender american professional ii stratocaster", "categoria": "guitarra", "precio_max": 3500, "paginas": 1},
+    {"slug": "prs-se-custom-24", "consulta": "prs se custom 24", "categoria": "guitarra", "precio_max": 3500, "paginas": 1},
+    {"slug": "jackson-pro-soloist", "consulta": "jackson pro series soloist", "categoria": "guitarra", "precio_max": 3500, "paginas": 1},
+    {"slug": "music-man-stingray-bass", "consulta": "music man stingray bass", "categoria": "bajo", "precio_max": 3500, "paginas": 1}
+  ]
+}

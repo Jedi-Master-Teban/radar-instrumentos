@@ -1,4 +1,4 @@
-"""Uso:  python -m radar correr [--prueba] | colombia | sitio [--salida DIR] [--sin-colombia] [--repo DUEÑO/NOMBRE] | web | modelos | probar-telegram"""
+"""Uso:  python -m radar captura conocidos|armar FILAS MODELOS | correr [--prueba] | colombia | sitio [--salida DIR] [--sin-colombia] [--repo DUEÑO/NOMBRE] | web | modelos | probar-telegram"""
 from __future__ import annotations
 
 import json
@@ -138,10 +138,13 @@ def probar_telegram() -> int:
 
 
 def main(argv: list[str]) -> int:
-    orden = {"correr": correr, "sitio": sitio, "colombia": colombia, "web": web, "modelos": modelos, "probar-telegram": probar_telegram}
+    orden = {"captura": None, "correr": correr, "sitio": sitio, "colombia": colombia, "web": web, "modelos": modelos, "probar-telegram": probar_telegram}
     if len(argv) < 2 or argv[1] not in orden:
         print(__doc__)
         return 1
+    if argv[1] == "captura":
+        from .captura_reverb import main as captura
+        return captura(argv[2:])
     if argv[1] == "sitio":
         return sitio(argv[2:])
     if argv[1] == "correr":

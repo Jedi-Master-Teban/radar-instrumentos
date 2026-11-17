@@ -1,5 +1,8 @@
 # Capturas
 
+La tarea programada de cada mañana reemplaza `reverb-<slug>.json` por cada búsqueda de `busquedas.json`
+(edita esa lista desde GitHub para cambiar qué se busca). Si una búsqueda falla, se conserva la del día anterior.
+
 Cada archivo `datos/capturas/*.json` es una tanda de publicaciones leídas con un navegador normal y **ya
 identificadas** (marca, modelo, estado). El tablero las importa solo al abrir "Publicaciones" y las evalúa al
 instante, sin modelo de lenguaje: los comparables de EE. UU. salen de las propias capturas (mismo `marca` +

@@ -83,6 +83,13 @@ def leer_captura(ruta: Path) -> tuple[list[tuple[Listing, Normalizado]], list[Pr
     return pares, precios
 
 
+def _fecha_captura(ruta: Path) -> str:
+    try:
+        return str(json.loads(ruta.read_text(encoding="utf-8")).get("capturado") or "")
+    except (OSError, ValueError):
+        return ""
+
+
 def importar(con, carpeta: Path, trm: float, hoy: date, forzar: bool = False) -> dict | None:
     """Evalúa las capturas nuevas o modificadas. Devuelve el resumen, o None si no había nada que importar."""
     if not carpeta.exists():
@@ -93,17 +100,25 @@ def importar(con, carpeta: Path, trm: float, hoy: date, forzar: bool = False) ->
     if not forzar and all(vistas.get(n) == m for n, m in actuales.items()):
         return None
     modelo, fuente = ModeloCaptura(), FuenteCapturas()
-    todos: list[Listing] = []
+    leidos = []
     for a in archivos:  # se leen todas: los comparables salen del conjunto completo
         try:
-            pares, precios = leer_captura(a)
+            leidos.append((_fecha_captura(a), a.name, *leer_captura(a)))
         except (OSError, ValueError) as e:
             db.evento(con, "captura_invalida", f"{a.name}: {e}")
-            continue
-        fuente.items += precios
+    # Si una publicación aparece en varias capturas, cuenta una sola vez: la de la captura más reciente.
+    por_id: dict = {}
+    precios: dict = {}
+    for _fecha, _nombre, pares, pr in sorted(leidos, key=lambda x: (x[0], x[1])):
         for l, n in pares:
-            modelo.por_titulo[l.titulo] = n
-            todos.append(l)
+            por_id[(l.plataforma, l.id_externo)] = (l, n)
+        for x in pr:
+            precios[(x.condicion, x.url or f"{x.titulo}|{x.precio}")] = x
+    fuente.items = list(precios.values())
+    todos: list[Listing] = []
+    for l, n in por_id.values():
+        modelo.por_titulo[l.titulo] = n
+        todos.append(l)
     entregado = []
 
     def lector(_consulta):
