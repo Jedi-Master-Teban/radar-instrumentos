@@ -1,0 +1,68 @@
+{% extends "base.html" %}{% import "_macros.html" as m %}
+{% block titulo %}Explorar · Radar de instrumentos{% endblock %}
+{% block cuerpo %}
+<div class="seccion-cab"><h1>Explorar</h1><span class="suave pequeno" id="cuenta">{{ ops|length }} publicaciones</span></div>
+<form class="filtros" id="filtros" onsubmit="return false">
+<label>Buscar<input type="search" id="f-texto" placeholder="Modelo, color, año…"></label>
+<label>Categoría<select id="f-cat"><option value="">Todas</option>{% for c, nombre, n in categorias %}{% if n %}<option value="{{ c }}">{{ nombre }} ({{ n }})</option>{% endif %}{% endfor %}</select></label>
+<label>Veredicto<select id="f-clase"><option value="">Todos</option><option value="oportunidad">Solo oportunidades</option>
+<option value="reventa">Reventa</option><option value="ganga">Ganga</option><option value="posible">Posible reventa</option><option value="bajo">Bajo el mercado</option>
+<option value="mercado">A precio de mercado</option><option value="sinmargen">Sin margen</option><option value="encima">Sobre el mercado</option><option value="sincomp">Sin comparables</option><option value="pri">Neck-thru</option></select></label>
+<label>Marca<select id="f-marca"><option value="">Todas</option>{% for x in marcas %}<option>{{ x }}</option>{% endfor %}</select></label>
+<label>Plataforma<select id="f-plat"><option value="">Todas</option>{% for x in plataformas %}<option value="{{ x }}">{{ x|capitalize }}</option>{% endfor %}</select></label>
+<label>Precio máximo (USD)<input type="number" id="f-max" min="0" step="50" placeholder="Sin límite"></label>
+<label>Estado<select id="f-estado"><option value="activas">Sin descartar</option><option value="">Todas</option>{% for x in estados %}<option>{{ x }}</option>{% endfor %}</select></label>
+</form>
+{% if ops %}<div class="caja tabla"><table id="tabla"><thead>{{ m.cabecera_tabla(True) }}</thead><tbody>{% for o in ops %}{{ m.fila(o, e) }}{% endfor %}</tbody></table></div>
+<p class="vacio oculto" id="sin-resultados">Ninguna publicación cumple estos filtros.</p>
+{% else %}<div class="vacio">Todavía no hay publicaciones evaluadas.</div>{% endif %}
+{% endblock %}
+{% block js %}
+<script>
+(function(){
+  var filas = Array.prototype.slice.call(document.querySelectorAll('#tabla tbody tr'));
+  if (!filas.length) return;
+  var $ = function(id){ return document.getElementById(id); };
+  var OPORT = {reventa:1, ganga:1, posible:1, bajo:1};
+  var estadoLocal = {};
+  try { estadoLocal = JSON.parse(localStorage.getItem('radar-estados') || '{}'); } catch (err) {}
+  function estadoDe(tr){ var id = tr.querySelector('a.tit').getAttribute('href'); return estadoLocal[id] || tr.dataset.estado; }
+  function aplicar(){
+    var t = $('f-texto').value.trim().toLowerCase(), c = $('f-cat').value, k = $('f-clase').value, ma = $('f-marca').value,
+        pl = $('f-plat').value, mx = parseFloat($('f-max').value), es = $('f-estado').value, n = 0;
+    filas.forEach(function(tr){
+      var d = tr.dataset, est = estadoDe(tr), ok = true;
+      if (t && d.texto.indexOf(t) < 0) ok = false;
+      if (c && d.cat !== c) ok = false;
+      if (k === 'oportunidad' && !OPORT[d.clase] && d.pri !== '1') ok = false;
+      else if (k === 'pri' && d.pri !== '1') ok = false;
+      else if (k && k !== 'oportunidad' && k !== 'pri' && d.clase !== k) ok = false;
+      if (ma && d.marca !== ma) ok = false;
+      if (pl && d.plat !== pl) ok = false;
+      if (!isNaN(mx) && parseFloat(d.precio) > mx) ok = false;
+      if (es === 'activas' && est === 'descartada') ok = false;
+      else if (es && es !== 'activas' && est !== es) ok = false;
+      tr.classList.toggle('oculto', !ok); if (ok) n++;
+    });
+    $('cuenta').textContent = n + ' de ' + filas.length + ' publicaciones';
+    $('sin-resultados').classList.toggle('oculto', n > 0);
+  }
+  var cuerpo = document.querySelector('#tabla tbody'), dir = {};
+  document.querySelectorAll('th button[data-orden]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var campo = b.dataset.orden; dir[campo] = !dir[campo];
+      var s = dir[campo] ? -1 : 1;
+      filas.sort(function(a, z){ return s * (parseFloat(a.dataset[campo]) - parseFloat(z.dataset[campo])); });
+      filas.forEach(function(tr){ cuerpo.appendChild(tr); });
+    });
+  });
+  ['f-texto','f-cat','f-clase','f-marca','f-plat','f-max','f-estado'].forEach(function(id){
+    $(id).addEventListener('input', aplicar); $(id).addEventListener('change', aplicar);
+  });
+  var h = decodeURIComponent(location.hash.slice(1));
+  if (h.indexOf('cat-') === 0) $('f-cat').value = h.slice(4);
+  else if (h) $('f-clase').value = h;
+  aplicar();
+})();
+</script>
+{% endblock %}

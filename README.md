@@ -1,5 +1,8 @@
 # Radar de instrumentos usados (EE. UU. → Colombia)
 
+**Sitio publicado:** https://jedi-master-teban.github.io/radar-instrumentos/ (público, no indexado por buscadores).
+Se reconstruye solo con cada captura nueva en `datos/capturas/` y todos los días a las 6:17 a. m. de Bogotá.
+
 Cada día lee eBay, Reverb y Facebook Marketplace, identifica guitarras, bajos, pedales y cuerdas en oferta,
 los compara con precios usados y nuevos de EE. UU. y de Colombia, calcula el costo puesto en pesos y te avisa
 por Telegram con una oferta sugerida. **Tú** envías la oferta: la herramienta solo lee.
@@ -11,7 +14,7 @@ cd ~/Código/radar-instrumentos
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 playwright install chromium
-pytest -q                      # 118 pruebas, sin red
+pytest -q                      # 122 pruebas, sin red
 python -m radar web            # tablero en http://127.0.0.1:8000
 ```
 
@@ -69,6 +72,17 @@ Todos los porcentajes y topes se editan en **Parámetros**.
 La navegación real con Playwright (`radar/collectors/base.py`) **no se ha ejecutado todavía**: las pruebas usan
 muestras guardadas. La primera corrida real es la verificación pendiente; si un lector devuelve cero
 resultados, recibes el aviso `lector_sin_resultados` y hay que ajustar sus selectores.
+
+## Cambiar algo sin Terminal
+
+Todo se edita desde la web de GitHub (lápiz "Edit" en cada archivo); al guardar, el sitio se reconstruye en ~2 minutos:
+
+- `datos/parametros.json`: margen mínimo, regateo, fletes supuestos, impuestos, palabras prioritarias.
+- `datos/referencias_co.json`: precios reales de Colombia por modelo, que mandan sobre la estimación.
+  Formato: `[{"marca": "Strandberg", "modelo": "Boden Prog NX 6", "usado_cop": 7500000}]`.
+- `datos/capturas/*.json`: publicaciones nuevas (formato en `datos/README.md`).
+
+El estado de cada publicación (ofertada, comprada, descartada) en el sitio se guarda solo en el navegador donde lo marcas.
 
 ## Capturas en el repositorio
 

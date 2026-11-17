@@ -1,4 +1,4 @@
-"""Uso:  python -m radar correr [--prueba] | colombia | web | modelos | probar-telegram"""
+"""Uso:  python -m radar correr [--prueba] | colombia | sitio [--salida DIR] [--sin-colombia] [--repo DUEÑO/NOMBRE] | web | modelos | probar-telegram"""
 from __future__ import annotations
 
 import json
@@ -98,6 +98,20 @@ def colombia() -> int:
     return 0
 
 
+def sitio(argv: list[str]) -> int:
+    """Construye el sitio estático (GitHub Pages) a partir de datos/."""
+    from pathlib import Path
+
+    from .sitio import construir
+
+    def opcion(nombre, defecto=""):
+        return argv[argv.index(nombre) + 1] if nombre in argv and argv.index(nombre) + 1 < len(argv) else defecto
+
+    construir(Path(opcion("--salida", "_site")), colombia="--sin-colombia" not in argv, repo=opcion("--repo"),
+              log=lambda m: print(m, flush=True))
+    return 0
+
+
 def web() -> int:
     import uvicorn
 
@@ -124,10 +138,12 @@ def probar_telegram() -> int:
 
 
 def main(argv: list[str]) -> int:
-    orden = {"correr": correr, "colombia": colombia, "web": web, "modelos": modelos, "probar-telegram": probar_telegram}
+    orden = {"correr": correr, "sitio": sitio, "colombia": colombia, "web": web, "modelos": modelos, "probar-telegram": probar_telegram}
     if len(argv) < 2 or argv[1] not in orden:
         print(__doc__)
         return 1
+    if argv[1] == "sitio":
+        return sitio(argv[2:])
     if argv[1] == "correr":
         return correr(prueba="--prueba" in argv[2:])
     return orden[argv[1]]()

@@ -7,16 +7,12 @@ from pathlib import Path
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 
-from .. import config, db
-from ..costing import ingreso_neto, margen
+from .. import config, db, vistas
 from ..models import ESTADOS_OPORTUNIDAD
-from ..notify import cop, usd
 from ..valuation import fijar_referencia_manual
 
-PLANTILLAS = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
-PLANTILLAS.env.filters.update(cop=cop, usd=usd, pct=lambda x: "—" if x is None else f"{x * 100:.0f} %")
+ENTORNO = vistas.entorno()
 NUMERICOS = ["margen_objetivo", "arancel", "iva", "sales_tax_us", "margen_cambiario", "descuento_negociacion_co",
              "descuento_negociacion_us", "factor_usado_sobre_nuevo_co", "comision_canal", "min_refs_co",
              "min_comparables_us", "cache_co_dias", "cache_us_dias", "max_alertas_dia", "max_normalizar_dia",
@@ -69,38 +65,40 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo, carpeta_ca
         except (OSError, ValueError):
             return False
 
+    def html(conexion, plantilla: str, activa: str, **ctx) -> HTMLResponse:
+        return HTMLResponse(ENTORNO.get_template(plantilla).render(vistas.contexto(conexion, "local", activa, **ctx)))
+
+    def problemas_de(c, ult) -> list[dict]:
+        if not ult:
+            return []
+        previa = c.execute("select coalesce(max(id), 0) from eventos where tipo in ('corrida', 'importacion') "
+                           "and id < ?", (ult["id"],)).fetchone()[0]
+        vistos, salida = set(), []
+        for e in c.execute("select tipo, detalle from eventos where id > ? and id < ? and tipo in "
+                           "('lector_bloqueado', 'lector_error', 'lector_sin_resultados', "
+                           "'modelo_respuesta_invalida', 'telegram_error')", (previa, ult["id"])):
+            fuente = e["detalle"].split(":")[0][:40]
+            if (e["tipo"], fuente) not in vistos:
+                vistos.add((e["tipo"], fuente))
+                salida.append({"tipo": e["tipo"], "fuente": fuente})
+        return salida
+
     @app.get("/corrida", response_class=HTMLResponse)
-    def ver_corrida(request: Request):
+    def ver_corrida():
+        import re
+
+        from ..capturas import CARPETA
+
         ruta = aj.home / "corrida.log"
         registro = "\n".join(ruta.read_text(errors="replace").splitlines()[-120:]) if ruta.exists() else ""
         c = con()
-        ult = c.execute("select id, fecha, tipo, detalle from eventos where tipo in ('corrida', 'importacion') "
-                        "order by id desc limit 1").fetchone()
-        resumen, problemas = None, []
-        if ult:
-            try:
-                resumen = json.loads(ult["detalle"]) | {"fecha": ult["fecha"], "origen": ult["tipo"]}
-            except ValueError:
-                resumen = None
-            previa = c.execute("select coalesce(max(id), 0) from eventos where tipo in ('corrida', 'importacion') "
-                               "and id < ?", (ult["id"],)).fetchone()[0]
-            vistos = set()
-            for e in c.execute("select tipo, detalle from eventos where id > ? and id < ? and tipo in "
-                               "('lector_bloqueado', 'lector_error', 'lector_sin_resultados', "
-                               "'modelo_respuesta_invalida', 'telegram_error')", (previa, ult["id"])):
-                fuente = e["detalle"].split(":")[0][:40]
-                if (e["tipo"], fuente) not in vistos:
-                    vistos.add((e["tipo"], fuente))
-                    problemas.append({"tipo": e["tipo"], "fuente": fuente})
-        avance = None
-        if registro:
-            import re
-            m = re.findall(r"^\[(\d+)/(\d+)\]", registro, flags=re.M)
-            if m:
-                avance = (int(m[-1][0]), int(m[-1][1]))
-        return PLANTILLAS.TemplateResponse(request, "corrida.html", {
-            "activa": corrida_activa(), "registro": registro, "nim": bool(config.cargar(None).nim_api_key),
-            "resumen": resumen, "problemas": problemas, "avance": avance})
+        m = re.findall(r"^\[(\d+)/(\d+)\]", registro, flags=re.M)
+        p = db.parametros(c)
+        return html(c, "estado.html", "estado", activa_corrida=corrida_activa(), registro=registro,
+                    avance=(int(m[-1][0]), int(m[-1][1])) if m else None,
+                    nim=bool(config.cargar(None).nim_api_key), problemas=problemas_de(c, vistas.ultima_actualizacion(c)),
+                    capturas=vistas.capturas_info(carpeta_capturas or CARPETA), colombia=vistas.colombia_info(c),
+                    tiendas=[t["nombre"] for t in p["tiendas_co"]], p=p)
 
     @app.post("/corrida")
     def iniciar_corrida(modo: str = Form("prueba")):
@@ -146,64 +144,35 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo, carpeta_ca
         except Exception as e:  # el tablero nunca debe caerse por una captura
             db.evento(c, "importacion_error", f"{type(e).__name__}: {e}")
 
-    ORDEN_TIPO = {"reventa": 0, "ganga": 1, "observacion": 2}
-    NOMBRE_CATEGORIA = {"guitarra": "Guitarras", "bajo": "Bajos", "pedal": "Pedales", "cuerdas": "Cuerdas"}
-
     @app.get("/", response_class=HTMLResponse)
-    def lista(request: Request, plataforma: str = "", marca: str = "", tipo: str = "", estado: str = "nueva",
-              ver: str = "todas"):
+    def hoy():
         c = con()
         _importar_capturas(c)
-        ops, todas = [], []
-        for f in c.execute("select * from oportunidades"):
-            d = json.loads(f["datos"])
-            o = {"id": f["id"], "tipo": f["tipo"], "puntaje": f["puntaje"], "estado": f["estado"], **d}
-            todas.append(o)
-            if plataforma and d["listing"]["plataforma"] != plataforma:
-                continue
-            if marca and d["normalizado"]["marca"].lower() != marca.lower():
-                continue
-            if tipo and f["tipo"] != tipo or estado and f["estado"] != estado:
-                continue
-            if ver == "oportunidades" and f["tipo"] == "observacion":
-                continue
-            ops.append(o)
-        ops.sort(key=lambda o: (ORDEN_TIPO.get(o["tipo"], 9), -o["puntaje"], -bool(o.get("prioritario")),
-                                o.get("descuento_us") is None, -(o.get("descuento_us") or 0)))
-        grupos = [(NOMBRE_CATEGORIA[cat], [o for o in ops if o["normalizado"]["categoria"] == cat])
-                  for cat in NOMBRE_CATEGORIA]
-        vivas = [o for o in todas if o["estado"] == "nueva"]
-        resumen = {
-            "reventa": sum(o["tipo"] == "reventa" for o in vivas),
-            "ganga": sum(o["tipo"] == "ganga" for o in vivas),
-            "bajo": sum(o["tipo"] == "observacion" and (o.get("descuento_us") or 0) >= 0.10 for o in vivas),
-            "evaluadas": len(vivas),
-            "prioritarias": sum(bool(o.get("prioritario")) for o in vivas),
-        }
-        ultima = c.execute("select fecha from eventos where tipo in ('corrida', 'importacion') "
-                           "order by id desc limit 1").fetchone()
-        return PLANTILLAS.TemplateResponse(request, "lista.html", {
-            "grupos": [g for g in grupos if g[1]], "total": len(ops), "resumen": resumen,
-            "marcas": sorted({o["normalizado"]["marca"] for o in todas}),
-            "plataformas": sorted({o["listing"]["plataforma"] for o in todas}),
-            "f": dict(plataforma=plataforma, marca=marca, tipo=tipo, estado=estado, ver=ver),
-            "estados": ESTADOS_OPORTUNIDAD, "ultima": ultima["fecha"] if ultima else None,
-            "corridas": c.execute("select count(*) from eventos where tipo in ('corrida', 'importacion')").fetchone()[0]})
+        ops = vistas.cargar_ops(c)
+        dest = vistas.destacadas(ops)
+        ids = {o["id"] for o in dest}
+        resto = [o for o in ops if o["id"] not in ids and o["estado"] != "descartada"][:10]
+        return html(c, "hoy.html", "hoy", resumen=vistas.resumen(ops), destacadas=dest, resto=resto,
+                    total=len(ops), categorias=vistas.por_categoria(ops))
+
+    @app.get("/explorar", response_class=HTMLResponse)
+    def explorar():
+        c = con()
+        _importar_capturas(c)
+        ops = vistas.cargar_ops(c)
+        return html(c, "explorar.html", "explorar", ops=ops, categorias=vistas.por_categoria(ops),
+                    marcas=sorted({o["normalizado"]["marca"] for o in ops}),
+                    plataformas=sorted({o["listing"]["plataforma"] for o in ops}), estados=ESTADOS_OPORTUNIDAD)
 
     @app.get("/oportunidad/{oid}", response_class=HTMLResponse)
-    def detalle(request: Request, oid: int):
+    def detalle(oid: int):
         c = con()
-        f = _op(c, oid)
-        d = json.loads(f["datos"])
-        p = db.parametros(c)
-        real = None
-        if f["flete_real_cop"] is not None and d.get("precio_co_cop"):
-            from ..costing import costo_puesto
-            costo_retiro = costo_puesto(d["oferta"]["retiro_usd"], d["listing"]["envio_us_usd"], d["trm"], p)
-            real = margen(ingreso_neto(d["precio_co_cop"], p), costo_retiro.total_cop, f["flete_real_cop"])
-        return PLANTILLAS.TemplateResponse(request, "detalle.html", {
-            "o": {"id": f["id"], "tipo": f["tipo"], "puntaje": f["puntaje"], "estado": f["estado"], **d},
-            "flete_real": f["flete_real_cop"], "margen_real": real, "estados": ESTADOS_OPORTUNIDAD})
+        o = next((x for x in vistas.cargar_ops(c) if x["id"] == oid), None)
+        if o is None:
+            raise HTTPException(404, "Oportunidad no encontrada")
+        dg = o["desglose"]
+        cuentas = vistas.cuentas(dg, o["flete_real_cop"]) if dg else None
+        return html(c, "detalle.html", "", o=o, dg=dg, c=cuentas)
 
     @app.post("/oportunidad/{oid}/estado")
     def cambiar_estado(oid: int, estado: str = Form(...)):
@@ -226,10 +195,11 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo, carpeta_ca
         return RedirectResponse(f"/oportunidad/{oid}", status_code=303)
 
     @app.get("/parametros", response_class=HTMLResponse)
-    def ver_parametros(request: Request):
-        p = db.parametros(con())
-        return PLANTILLAS.TemplateResponse(request, "parametros.html", {
-            "p": p, "numericos": NUMERICOS, "tiendas_json": json.dumps(p["tiendas_co"], ensure_ascii=False, indent=1)})
+    def ver_parametros():
+        c = con()
+        p = db.parametros(c)
+        return html(c, "parametros.html", "parametros", p=p, numericos=NUMERICOS,
+                    tiendas_json=json.dumps(p["tiendas_co"], ensure_ascii=False, indent=1))
 
     @app.post("/parametros")
     async def guardar_parametros(request: Request):
@@ -265,11 +235,11 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo, carpeta_ca
         return RedirectResponse("/parametros", status_code=303)
 
     @app.get("/watchlist", response_class=HTMLResponse)
-    def ver_watchlist(request: Request):
+    def ver_watchlist():
         c = con()
-        return PLANTILLAS.TemplateResponse(request, "watchlist.html", {
-            "items": c.execute("select * from watchlist order by categoria, marca").fetchall(),
-            "refs": c.execute("select * from referencias_co order by marca, modelo").fetchall()})
+        return html(c, "watchlist.html", "seguimiento",
+                    items=c.execute("select * from watchlist order by categoria, marca").fetchall(),
+                    refs=c.execute("select * from referencias_co order by marca, modelo").fetchall())
 
     @app.post("/watchlist")
     def agregar(categoria: str = Form(...), marca: str = Form(...), consulta: str = Form(...)):
@@ -289,18 +259,23 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo, carpeta_ca
         return RedirectResponse("/watchlist", status_code=303)
 
     @app.post("/referencia")
-    def referencia_manual(marca: str = Form(...), modelo: str = Form(...), usado_cop: float = Form(...)):
+    def referencia_manual(request: Request, marca: str = Form(...), modelo: str = Form(...),
+                          usado_cop: float = Form(...)):
         if usado_cop <= 0 or not marca.strip() or not modelo.strip():
             raise HTTPException(422, "Datos no válidos")
-        fijar_referencia_manual(con(), marca.strip(), modelo.strip(), usado_cop, date.today())
-        return RedirectResponse("/watchlist", status_code=303)
+        c = con()
+        fijar_referencia_manual(c, marca.strip(), modelo.strip(), usado_cop, date.today())
+        db.set_parametro(c, "capturas_importadas", {})  # reevalúa con la nueva referencia
+        _importar_capturas(c)
+        volver = request.headers.get("referer") or ""
+        return RedirectResponse("/oportunidad/" + volver.rsplit("/oportunidad/", 1)[1] if "/oportunidad/" in volver
+                                else "/watchlist", status_code=303)
 
     @app.get("/ajustes", response_class=HTMLResponse)
-    def ver_ajustes(request: Request):
+    def ver_ajustes():
         a = config.cargar(None)
-        return PLANTILLAS.TemplateResponse(request, "ajustes.html", {
-            "nim": bool(a.nim_api_key), "modelo": a.nim_model, "tg": bool(a.telegram_bot_token),
-            "chat": a.telegram_chat_id, "perfil": Path(aj.perfil_fb).exists()})
+        return html(con(), "ajustes.html", "ajustes", nim=bool(a.nim_api_key), modelo=a.nim_model,
+                    tg=bool(a.telegram_bot_token), chat=a.telegram_chat_id, perfil=Path(aj.perfil_fb).exists())
 
     @app.post("/ajustes")
     def guardar_ajustes(nim_api_key: str = Form(""), nim_model: str = Form(""), telegram_bot_token: str = Form(""),
@@ -311,9 +286,9 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo, carpeta_ca
         return RedirectResponse("/ajustes", status_code=303)
 
     @app.get("/eventos", response_class=HTMLResponse)
-    def eventos(request: Request):
-        filas = con().execute("select * from eventos order by id desc limit 200").fetchall()
-        return PLANTILLAS.TemplateResponse(request, "eventos.html", {"eventos": filas})
+    def eventos():
+        c = con()
+        return html(c, "eventos.html", "", eventos=c.execute("select * from eventos order by id desc limit 200").fetchall())
 
     return app
 

@@ -1,22 +1,150 @@
-{% extends "base.html" %}{% block cuerpo %}
-<h1>{{ o.listing.titulo }}</h1>
-<p><span class="et {{ o.tipo }}">{{ o.veredicto or o.tipo }}</span>{% if o.prioritario %} <span class="et pri">neck-thru</span>{% endif %} · {{ o.normalizado.categoria }} · {{ o.listing.plataforma }} · {{ o.normalizado.marca }} {{ o.normalizado.modelo }} · estado {{ o.normalizado.estado }} · <a href="{{ o.listing.url }}" target="_blank" rel="noopener">Abrir publicación</a></p>
-{% for b in o.banderas %}<p class="aviso">⚠ {{ b }}</p>{% endfor %}
-{% if o.listing.fotos %}<img class="foto" src="{{ o.listing.fotos[0] }}" alt="">{% endif %}
-<div class="rejilla">
-<div class="tarjeta"><h2>Oferta sugerida</h2>Pedido: {{ o.listing.precio_usd|usd }}<br>{% if o.oferta %}Apertura: <b>{{ o.oferta.apertura_usd|usd }}</b><br>Techo: {{ o.oferta.techo_usd|usd }}<br>Retiro: {{ o.oferta.retiro_usd|usd }}{% else %}<span class="suave">Sin oferta razonable: el precio pedido está muy lejos del tope.</span>{% endif %}</div>
-<div class="tarjeta"><h2>EE. UU.</h2>{% if o.valoracion_us %}Usado (mediana ajustada): {{ o.valoracion_us.mediana_usd|usd }}<br>Rango: {{ o.valoracion_us.p25_usd|usd }} – {{ o.valoracion_us.p75_usd|usd }} ({{ o.valoracion_us.n }} refs)<br>Nuevo: {{ o.valoracion_us.nuevo_usd|usd }}<br>Frente al usado: {% if o.descuento_us >= 0 %}−{{ o.descuento_us|pct }}{% else %}+{{ (-o.descuento_us)|pct }}{% endif %}{% else %}<span class="suave">Menos de 3 publicaciones comparables del mismo modelo: no se puede valorar todavía.</span>{% endif %}</div>
-<div class="tarjeta"><h2>Colombia</h2>{% if o.precio_co_cop is defined %}{% if o.confianza_co == 'baja' %}<span class="suave">Este modelo no aparece en Colombia.</span><br>Referencia estimada: <b>{{ o.precio_co_cop|cop }}</b><br><span class="suave">{{ o.origen_co }}</span>{% else %}Usado: {{ o.referencia_co.usado_cop|cop }} ({{ o.referencia_co.n_usado }} refs)<br>Nuevo: {{ o.referencia_co.nuevo_cop|cop }} ({{ o.referencia_co.n_nuevo }} refs)<br>Referencia: <b>{{ o.precio_co_cop|cop }}</b> <span class="suave">({{ o.origen_co }})</span>{% endif %}{% else %}<span class="suave">Sin valorar.</span>{% endif %}</div>
-{% if o.venta is defined %}<div class="tarjeta"><h2>Venta sugerida en Colombia</h2>Publicar en: <b>{{ o.venta.lista_cop|cop }}</b><br>Cierre esperado: {{ o.venta.objetivo_cop|cop }}<br>Piso (no vender por menos): {{ o.venta.piso_cop|cop }}<br><span class="suave">Comprando a {{ o.compra_supuesta_usd|usd }}: margen {{ o.margen_en_retiro|pct }} al cierre, {{ o.venta.margen_lista|pct }} al precio de lista.</span></div>{% endif %}
-<div class="tarjeta"><h2>Costo puesto (sin flete)</h2>Base: {{ o.costo.base_cop|cop }}<br>Arancel: {{ o.costo.arancel_cop|cop }}<br>IVA: {{ o.costo.iva_cop|cop }}<br>Total: <b>{{ o.costo.total_cop|cop }}</b> <span class="suave">TRM {{ '%.0f'|format(o.trm) }}</span>
-{% if o.flete_maximo_cop is defined %}<br>Flete máximo tolerable: {{ o.flete_maximo_cop|cop }}<br>Margen al precio de retiro: {{ o.margen_en_retiro|pct }} <span class="suave">(flete supuesto {{ o.flete_supuesto_cop|cop }})</span>{% endif %}</div>
+{% extends "base.html" %}{% import "_macros.html" as m %}
+{% block titulo %}{{ o.normalizado.marca }} {{ o.normalizado.modelo }} · Radar de instrumentos{% endblock %}
+{% block cuerpo %}
+<div><a href="{{ e('hoy') }}" class="pequeno">← Volver</a></div>
+<div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+<div class="foto" style="width:300px;max-width:100%;height:210px;border-radius:12px">{% if o.listing.fotos %}<img src="{{ o.listing.fotos[0] }}" alt="">{% else %}{{ o.normalizado.marca }} {{ o.normalizado.modelo }}{% endif %}</div>
+<div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:12px">
+{{ m.chips(o) }}
+<h1>{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</h1>
+<div class="suave">{{ o.listing.titulo }}</div>
+<div class="suave pequeno">{{ m.meta(o) }}{% if o.normalizado.anio %} · año {{ o.normalizado.anio }}{% endif %}</div>
+<div class="botones">
+<a class="boton prim" href="{{ o.listing.url }}" target="_blank" rel="noopener">Ver publicación en {{ o.listing.plataforma|capitalize }}</a>
+{% if modo == 'local' %}<form method="post" action="/oportunidad/{{ o.id }}/estado" class="fila">
+<button name="estado" value="ofertada">Marcar como ofertada</button><button name="estado" value="comprada">Comprada</button><button name="estado" value="descartada">Descartar</button>{% if o.estado != 'nueva' %}<button name="estado" value="nueva">Volver a nueva</button>{% endif %}</form>
+{% else %}<button type="button" data-estado="ofertada">Marcar como ofertada</button><button type="button" data-estado="comprada">Comprada</button><button type="button" data-estado="descartada">Descartar</button><button type="button" data-estado="" class="oculto" id="deshacer">Volver a nueva</button>{% endif %}
 </div>
-{% if o.precio_co_cop is defined %}<h2>Flete real cotizado</h2>
-<form class="fila" method="post" action="/oportunidad/{{ o.id }}/flete"><div><label>Flete en COP</label><input name="flete_real_cop" type="number" min="0" step="1000" value="{{ flete_real or '' }}" required></div><button>Recalcular</button>
-{% if margen_real is not none %}<span>Margen con flete real: <b>{{ margen_real|pct }}</b></span>{% endif %}</form>{% endif %}
-{% if o.senales %}<p>Señales del vendedor: {{ o.senales|join(', ') }}{% if o.dias_publicado is not none %} · {{ o.dias_publicado }} días publicado{% endif %}</p>{% endif %}
-{% if o.mensaje is defined %}<h2>Mensaje de oferta</h2><pre>{{ o.mensaje }}</pre>{% endif %}
-<h2>Estado</h2><form class="fila" method="post" action="/oportunidad/{{ o.id }}/estado"><select name="estado">{% for e in estados %}<option {{ 'selected' if o.estado==e }}>{{ e }}</option>{% endfor %}</select><button>Guardar</button></form>
-<h2>Comparables en EE. UU.</h2><table>{% for c in o.comps_us %}<tr><td>{{ c.fuente }}</td><td>{% if c.url %}<a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.titulo }}</a>{% else %}{{ c.titulo }}{% endif %}</td><td>{{ c.condicion }}</td><td class="n">{{ c.precio|usd }}</td></tr>{% else %}<tr><td class="suave">Sin detalle guardado.</td></tr>{% endfor %}</table>
-<h2>Referencias en Colombia</h2><table>{% for c in o.comps_co %}<tr><td>{{ c.fuente }}</td><td>{% if c.url %}<a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.titulo }}</a>{% else %}{{ c.titulo }}{% endif %}</td><td>{{ c.condicion }}</td><td class="n">{{ c.precio|cop }}</td></tr>{% else %}<tr><td class="suave">No se encontró este modelo en las tiendas ni mercados de Colombia.</td></tr>{% endfor %}</table>
+{% if modo != 'local' %}<div class="suave pequeno" id="nota-estado"></div>{% endif %}
+</div></div>
+{% for b in o.banderas %}<p class="aviso" style="margin:0">⚠ {{ b }}</p>{% endfor %}
+
+{% if c %}
+<section class="caja bloque" aria-labelledby="t-compra">
+<div><h2 id="t-compra">Compra</h2><div class="suave pequeno">Lo que pide el vendedor y hasta dónde te conviene llegar para conservar {{ dg.mo|pct }} de margen</div></div>
+<div class="pasos">
+<div class="paso"><div class="k">Precio pedido</div><div class="v">{{ o.listing.precio_usd|usd }}</div><div class="s">{% if o.descuento_us >= 0 %}{{ o.descuento_us|pct }} bajo la mediana{% else %}{{ (-o.descuento_us)|pct }} sobre la mediana{% endif %}</div></div>
+<span class="flecha" aria-hidden="true">→</span>
+<div class="paso"><div class="k">Abre con</div><div class="v" id="v-apertura">{{ c.apertura|usd if c.apertura else '—' }}</div><div class="s">primera oferta</div></div>
+<span class="flecha" aria-hidden="true">→</span>
+<div class="paso dest"><div class="k">Techo</div><div class="v" id="v-techo">{{ c.techo|usd if c.techo > 0 else '—' }}</div><div class="s" id="s-techo">{% if c.retiro %}no pagues más{% else %}el precio pedido está muy lejos{% endif %}</div></div>
+</div></section>
+
+<section class="caja bloque" aria-labelledby="t-venta">
+<div><h2 id="t-venta">Venta en Colombia</h2><div class="suave pequeno" id="s-origen">{% if o.confianza_co == 'baja' %}Referencia estimada: este modelo no aparece en tiendas colombianas{% else %}Referencia: {{ o.origen_co }}{% endif %}</div></div>
+<div class="pasos">
+<div class="paso"><div class="k">Publica en</div><div class="v" id="v-lista">{{ c.lista|cop }}</div><div class="s">precio de lista</div></div>
+<span class="flecha" aria-hidden="true">→</span>
+<div class="paso dest"><div class="k">Cierre esperado</div><div class="v" id="v-objetivo">{{ c.objetivo|cop }}</div><div class="s">tras {{ dg.regateo|pct }} de regateo</div></div>
+<span class="flecha" aria-hidden="true">→</span>
+<div class="paso"><div class="k">Piso</div><div class="v" id="v-piso">{{ c.piso|cop }}</div><div class="s">no vendas por menos</div></div>
+</div></section>
+
+<section class="caja bloque" aria-labelledby="t-peso">
+<div class="seccion-cab"><h2 id="t-peso">A dónde va cada peso</h2><span class="suave pequeno">Comprando a <span id="v-compra">{{ c.compra|usd }}</span> y vendiendo al cierre esperado</span></div>
+<div class="barra" id="barra" role="img" aria-label="Reparto del precio de venta"></div>
+<div class="leyenda" id="leyenda"></div>
+<div class="pares" style="max-width:520px">
+<div class="par"><span>Margen al cierre</span><span class="margen" id="v-margen">{{ c.margen|pct }}</span></div>
+<div class="par"><span>Ganancia</span><span id="v-ganancia">{{ c.ganancia|cop }}</span></div>
+<div class="par"><span>Flete máximo que aún deja {{ dg.mo|pct }}</span><span id="v-fmax">{{ c.flete_max|cop }}</span></div>
+</div>
+<div class="fila">
+<label>Flete real cotizado (COP)<input type="number" id="i-flete" min="0" step="10000" value="{{ (o.flete_real_cop or dg.flete)|round|int }}"></label>
+<label>Tu precio de referencia en Colombia (COP)<input type="number" id="i-ref" min="0" step="50000" value="{{ dg.ref|round|int }}"></label>
+<button type="button" id="b-restaurar">Restaurar</button>
+</div>
+{% if modo == 'local' %}<div class="fila">
+<form method="post" action="/oportunidad/{{ o.id }}/flete" class="fila"><input type="hidden" name="flete_real_cop" id="h-flete" value="{{ (o.flete_real_cop or dg.flete)|round|int }}"><button>Guardar flete</button></form>
+<form method="post" action="/referencia" class="fila"><input type="hidden" name="marca" value="{{ o.normalizado.marca }}"><input type="hidden" name="modelo" value="{{ o.normalizado.modelo }}"><input type="hidden" name="usado_cop" id="h-ref" value="{{ dg.ref|round|int }}"><button>Fijar como referencia del modelo</button></form>
+</div>
+{% else %}<p class="suave pequeno" style="margin:0">Los cambios solo recalculan en tu navegador. Para fijar un precio de Colombia para este modelo, agrégalo en <a href="https://github.com/{{ repo }}/edit/main/datos/referencias_co.json" target="_blank" rel="noopener">datos/referencias_co.json</a>; el sitio se actualiza solo.</p>{% endif %}
+</section>
+{% else %}
+<section class="vacio">{% if not o.valoracion_us %}Hay menos de 3 publicaciones del mismo modelo en EE. UU., así que no hay mediana para valorarla ni oferta sugerida. Precio pedido: {{ o.listing.precio_usd|usd }}; costo puesto en Colombia sin flete: {{ o.costo.total_cop|cop }}.{% else %}Sin cuenta de compra y venta para esta publicación.{% endif %}</section>
+{% endif %}
+
+<div class="rejilla">
+<section class="caja bloque"><div><h2>Mismo modelo en EE. UU.</h2><div class="suave pequeno">{% if o.valoracion_us %}{{ o.valoracion_us.n }} usadas · mediana ajustada {{ o.valoracion_us.mediana_usd|usd }} (−10 % por negociación) · nuevo {{ o.valoracion_us.nuevo_usd|usd }}{% else %}Menos de 3 comparables{% endif %}</div></div>
+<table>{% for x in o.comps_us %}<tr><td>{% if x.url %}<a class="tit" href="{{ x.url }}" target="_blank" rel="noopener">{{ x.titulo[:60] }}</a>{% else %}{{ x.titulo[:60] }}{% endif %}<small>{{ x.fuente|capitalize }} · {{ x.condicion }}</small></td><td class="n">{{ x.precio|usd }}</td></tr>{% else %}<tr><td class="suave">Sin detalle guardado.</td></tr>{% endfor %}</table></section>
+<section class="caja bloque"><div><h2>Colombia</h2><div class="suave pequeno">{% if o.comps_co %}{{ o.comps_co|length }} publicaciones del mismo modelo{% else %}No aparece en las tiendas consultadas{% endif %}</div></div>
+{% if o.comps_co %}<table>{% for x in o.comps_co %}<tr><td>{% if x.url %}<a class="tit" href="{{ x.url }}" target="_blank" rel="noopener">{{ x.titulo[:60] }}</a>{% else %}{{ x.titulo[:60] }}{% endif %}<small>{{ x.fuente }} · {{ x.condicion }}</small></td><td class="n">{{ x.precio|cop }}</td></tr>{% endfor %}</table>
+{% elif o.precio_co_cop is defined %}<p style="margin:0">La referencia de {{ o.precio_co_cop|cop }} es una estimación: {{ o.origen_co|replace('estimado: ', '') }}. Si conoces un precio real en Bogotá, úsalo arriba.</p>{% endif %}
+</section>
+</div>
+
+{% if o.texto_mensaje %}<section class="caja bloque"><h2>Mensaje de oferta</h2>
+<p style="margin:0;font-size:15px;line-height:1.6" id="mensaje">{{ o.texto_mensaje }}</p>
+<div class="botones"><button type="button" id="b-copiar">Copiar mensaje</button><span class="suave pequeno" id="copiado" aria-live="polite"></span></div></section>{% endif %}
+{% endblock %}
+{% block js %}
+{% if dg %}<script id="datos" type="application/json">{{ dg|tojson }}</script>{% endif %}
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  function cop(x){ return '$' + Math.round(x).toLocaleString('es-CO'); }
+  function usd(x){ return 'US$' + Math.round(x).toLocaleString('en-US'); }
+  function pct(x){ return Math.round(x * 100) + ' %'; }
+  var b = $('b-copiar');
+  if (b) b.addEventListener('click', function(){
+    var t = $('mensaje').textContent;
+    try { navigator.clipboard.writeText(t).then(function(){ $('copiado').textContent = 'Copiado'; }, function(){ $('copiado').textContent = 'Selecciona el texto y cópialo'; }); }
+    catch (err) { $('copiado').textContent = 'Selecciona el texto y cópialo'; }
+  });
+  var clave = location.pathname, nota = $('nota-estado');
+  if (nota) {
+    var estados = {};
+    try { estados = JSON.parse(localStorage.getItem('radar-estados') || '{}'); } catch (err) {}
+    var mostrar = function(){
+      var s = estados[clave];
+      nota.textContent = s ? 'Marcada como ' + s + ' (guardado solo en este navegador).' : '';
+      $('deshacer').classList.toggle('oculto', !s);
+    };
+    document.querySelectorAll('button[data-estado]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        if (btn.dataset.estado) estados[clave] = btn.dataset.estado; else delete estados[clave];
+        try { localStorage.setItem('radar-estados', JSON.stringify(estados)); } catch (err) {}
+        mostrar();
+      });
+    });
+    mostrar();
+  }
+  var el = $('datos'); if (!el) return;
+  var d = JSON.parse(el.textContent);
+  function cuentas(flete, ref){
+    var ingreso = ref * (1 - d.comision), k = d.base_k * (1 + d.arancel) * (1 + d.iva);
+    var techo = (ingreso / (1 + d.mo) - flete) / k - d.envio;
+    var retiro = Math.min(techo, d.mediana, d.pedido), hay = retiro > 0 && retiro >= 0.6 * d.pedido;
+    var compra = hay ? retiro : d.pedido;
+    var base = (compra + d.envio) * d.base_k, ar = base * d.arancel, iva = (base + ar) * d.iva, total = base + ar + iva + flete;
+    return {techo: techo, hay: hay, apertura: hay ? Math.min(d.apertura_sobre_retiro * retiro, d.apertura_sobre_pedido * d.pedido) : null,
+      compra: compra, precio: base, arancel: ar, iva: iva, flete: flete, total: total, ingreso: ingreso, margen: ingreso / total - 1,
+      ganancia: ingreso - total, lista: ref / (1 - d.regateo), objetivo: ref, piso: total * (1 + d.mo), fmax: ingreso / (1 + d.mo) - (base + ar + iva)};
+  }
+  var COLORES = [['Precio', 'precio', '#6B7280'], ['Arancel', 'arancel', '#8B93A1'], ['IVA', 'iva', '#AEB5C0'], ['Flete', 'flete', '#F2A65A'], ['Margen', 'ganancia', '#5BD6A2']];
+  function pintar(){
+    var flete = parseFloat($('i-flete').value), ref = parseFloat($('i-ref').value);
+    if (isNaN(flete) || flete < 0) flete = d.flete; if (isNaN(ref) || ref <= 0) ref = d.ref;
+    var c = cuentas(flete, ref);
+    $('v-apertura').textContent = c.apertura ? usd(c.apertura) : '—';
+    $('v-techo').textContent = c.techo > 0 ? usd(c.techo) : '—';
+    $('s-techo').textContent = c.hay ? 'no pagues más' : 'el precio pedido está muy lejos';
+    $('v-lista').textContent = cop(c.lista); $('v-objetivo').textContent = cop(c.objetivo); $('v-piso').textContent = cop(c.piso);
+    $('v-compra').textContent = usd(c.compra); $('v-margen').textContent = pct(c.margen);
+    $('v-margen').className = 'margen' + (c.margen >= d.mo - 1e-9 ? '' : ' neg');
+    $('v-ganancia').textContent = cop(c.ganancia); $('v-fmax').textContent = cop(c.fmax);
+    var partes = COLORES.map(function(x){ return [x[0], Math.max(c[x[1]], 0), x[2]]; });
+    var suma = partes.reduce(function(a, x){ return a + x[1]; }, 0) || 1;
+    $('barra').innerHTML = partes.map(function(x){ return '<i style="width:' + (100 * x[1] / suma).toFixed(1) + '%;background:' + x[2] + '"></i>'; }).join('');
+    $('barra').setAttribute('aria-label', partes.map(function(x){ return x[0] + ' ' + Math.round(100 * x[1] / suma) + ' %'; }).join(', '));
+    $('leyenda').innerHTML = partes.map(function(x){ return '<span><i style="background:' + x[2] + '"></i>' + x[0] + ' · ' + cop(x[1]) + '</span>'; }).join('') +
+      (c.ganancia < 0 ? '<span class="aviso">Pérdida de ' + cop(-c.ganancia) + '</span>' : '');
+    if ($('h-flete')) $('h-flete').value = Math.round(flete);
+    if ($('h-ref')) $('h-ref').value = Math.round(ref);
+  }
+  $('i-flete').addEventListener('input', pintar); $('i-ref').addEventListener('input', pintar);
+  $('b-restaurar').addEventListener('click', function(){ $('i-flete').value = Math.round(d.flete); $('i-ref').value = Math.round(d.ref); pintar(); });
+  pintar();
+})();
+</script>
 {% endblock %}

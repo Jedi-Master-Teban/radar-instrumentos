@@ -1,35 +1,106 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block titulo %}Radar de instrumentos{% endblock %}</title>
+{% if modo == 'estatico' %}<meta name="robots" content="noindex, nofollow">{% endif %}
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
 <style>
-:root{--fondo:#f6f5f1;--tinta:#1d1d1b;--suave:#6b6a65;--linea:#dcdad2;--tarjeta:#fff;--acento:#0b6e4f;--alerta:#a4491a}
-@media (prefers-color-scheme:dark){:root{--fondo:#171716;--tinta:#ecebe6;--suave:#a09f98;--linea:#33322f;--tarjeta:#1f1f1d;--acento:#5ac8a0;--alerta:#f0a070}}
-*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,sans-serif;background:var(--fondo);color:var(--tinta)}
-header{display:flex;gap:1.2rem;align-items:baseline;padding:.9rem 1.2rem;border-bottom:1px solid var(--linea);flex-wrap:wrap}
-header b{font-size:1.05rem}header a{color:var(--suave);text-decoration:none}header a:hover{color:var(--tinta)}
-main{max-width:1150px;margin:0 auto;padding:1.2rem}h1{font-size:1.3rem;margin:.2rem 0 1rem}h2{font-size:1.05rem;margin:1.4rem 0 .5rem}
-table{width:100%;border-collapse:collapse;background:var(--tarjeta);border:1px solid var(--linea)}
-th,td{padding:.5rem .6rem;border-bottom:1px solid var(--linea);text-align:left;vertical-align:top}
-th{font-size:.8rem;color:var(--suave);font-weight:600}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
-a{color:var(--acento)}.et{display:inline-block;padding:.05rem .45rem;border-radius:3px;font-size:.78rem;border:1px solid var(--linea)}
-.et.reventa{border-color:var(--acento);color:var(--acento)}.et.ganga{border-color:var(--alerta);color:var(--alerta)}
-.aviso{color:var(--alerta)}.suave{color:var(--suave)}.fila{display:flex;gap:.6rem;flex-wrap:wrap;align-items:end;margin:.6rem 0}
-input,select,textarea,button{font:inherit;padding:.35rem .5rem;border:1px solid var(--linea);background:var(--tarjeta);color:var(--tinta);border-radius:4px}
-button{background:var(--acento);color:#fff;border-color:var(--acento);cursor:pointer}label{display:block;font-size:.8rem;color:var(--suave)}
-.rejilla{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:.8rem}.tarjeta{background:var(--tarjeta);border:1px solid var(--linea);padding:.8rem;border-radius:4px}
-pre{white-space:pre-wrap;background:var(--tarjeta);border:1px solid var(--linea);padding:.7rem;border-radius:4px}img.foto{max-width:260px;border-radius:4px}
-.envoltura{overflow-x:auto}
-.cifras{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem;margin:0 0 1.1rem}
-.cifra{background:var(--tarjeta);border:1px solid var(--linea);border-radius:6px;padding:.7rem .9rem}
-.cifra b{display:block;font-size:1.6rem;line-height:1.1;font-variant-numeric:tabular-nums}.cifra span{font-size:.8rem;color:var(--suave)}
-.cifra.si b{color:var(--acento)}.cifra.ojo b{color:var(--alerta)}
-.et.observacion{color:var(--suave)}.et.pri{border-color:var(--alerta);color:var(--alerta)}
-td small,th small{display:block;color:var(--suave);font-size:.78rem;font-weight:400}
-td .tit{font-weight:600;text-decoration:none}td .tit:hover{text-decoration:underline}
+:root{--fondo:#14161A;--sup:#1C1F25;--sup2:#22262E;--linea:#2A2E37;--tinta:#E9EBEE;--suave:#A3A9B4;--acento:#5BD6A2;--acento-tinta:#0E1512;--alerta:#F2A65A;--malo:#E58A8A;
+--titulos:'Space Grotesk',system-ui,sans-serif}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:var(--fondo);color:var(--tinta);font:15px/1.5 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--acento)}a:hover{color:#8BE6C0}
+.envol{max-width:1180px;margin:0 auto;padding:0 24px}
+.cab{border-bottom:1px solid var(--linea);position:sticky;top:0;background:color-mix(in srgb,var(--fondo) 92%,transparent);backdrop-filter:blur(8px);z-index:5}
+.cab .envol{display:flex;flex-wrap:wrap;gap:8px 28px;align-items:center;padding-top:14px;padding-bottom:14px}
+.marca{font-family:var(--titulos);font-weight:600;font-size:19px;color:var(--tinta);text-decoration:none}
+.cab nav{display:flex;flex-wrap:wrap;gap:4px 20px}
+.cab nav a{color:var(--suave);text-decoration:none;padding:6px 0;border-bottom:2px solid transparent}
+.cab nav a:hover{color:var(--tinta)}.cab nav a.activa{color:var(--tinta);border-bottom-color:var(--acento)}
+.cab .meta{margin-left:auto;font-size:13px;color:var(--suave)}
+main.envol{padding-top:28px;padding-bottom:56px;display:flex;flex-direction:column;gap:30px}
+h1,h2,h3{font-family:var(--titulos);font-weight:600;margin:0;letter-spacing:-.01em}
+h1{font-size:32px}h2{font-size:22px}h3{font-size:19px}
+.suave{color:var(--suave)}.aviso{color:var(--alerta)}.pequeno{font-size:13px}
+.seccion{display:flex;flex-direction:column;gap:14px}
+.seccion-cab{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px 16px}
+.cifras{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px}
+.cifra{background:var(--sup);border:1px solid var(--linea);border-radius:10px;padding:14px 18px;text-decoration:none;color:var(--tinta)}
+.cifra b{display:block;font-family:var(--titulos);font-size:32px;font-weight:600;line-height:1.15;font-variant-numeric:tabular-nums}
+.cifra span{font-size:13px;color:var(--suave)}.cifra.si b{color:var(--acento)}.cifra.pri b{color:var(--alerta)}
+a.cifra:hover{border-color:var(--suave)}
+.tarjetas{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:18px}
+.tarjeta{background:var(--sup);border:1px solid var(--linea);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.tarjeta .cuerpo{padding:18px;display:flex;flex-direction:column;gap:12px;flex:1}
+.foto{height:150px;background:var(--sup2);display:flex;align-items:center;justify-content:center;color:var(--suave);font-family:var(--titulos);font-size:15px;text-align:center;padding:0 18px}
+.foto img{width:100%;height:100%;object-fit:cover}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-block;font-size:12px;font-weight:600;border:1px solid var(--linea);color:var(--suave);border-radius:999px;padding:2px 10px;white-space:nowrap}
+.chip.reventa,.chip.ganga,.chip.posible{border-color:var(--acento);color:var(--acento)}
+.chip.bajo{border-color:color-mix(in srgb,var(--acento) 55%,var(--linea));color:#9FE3C5}
+.chip.pri{border-color:var(--alerta);color:var(--alerta)}.chip.encima{color:var(--malo);border-color:color-mix(in srgb,var(--malo) 50%,var(--linea))}
+.pares{display:flex;flex-direction:column;gap:8px}
+.par{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.par>span:first-child{font-size:13px;color:var(--suave)}
+.par>span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.par small,td small{display:block;font-size:12px;color:var(--suave);font-weight:400}
+.pie-tarjeta{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--linea);padding-top:12px;gap:10px}
+.margen{font-family:var(--titulos);font-size:22px;font-weight:600;color:var(--acento);font-variant-numeric:tabular-nums}
+.margen.neg{color:var(--suave)}
+.botones{display:flex;flex-wrap:wrap;gap:10px}
+.boton,button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 16px;border-radius:8px;border:1px solid var(--linea);background:transparent;color:var(--tinta);font:inherit;font-size:14px;text-decoration:none;cursor:pointer}
+.boton:hover,button:hover{border-color:var(--suave);color:var(--tinta)}
+.boton.prim,button.prim{background:var(--acento);border-color:var(--acento);color:var(--acento-tinta);font-weight:600}
+.boton.prim:hover,button.prim:hover{background:#7BE0B6;color:var(--acento-tinta)}
+.tarjeta .botones .boton{flex:1}
+.caja{background:var(--sup);border:1px solid var(--linea);border-radius:12px}
+.tabla{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{padding:10px 12px;text-align:left;font-size:12px;font-weight:500;color:var(--suave);white-space:nowrap}
+td{padding:11px 12px;border-top:1px solid var(--linea);vertical-align:top}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+td .tit{color:var(--tinta);font-weight:500;text-decoration:none}td .tit:hover{color:var(--acento)}
+th button{min-height:0;padding:0;border:0;color:inherit;font-size:12px;font-weight:500;background:none}
+th button:hover{color:var(--tinta)}
 .pos{color:var(--acento);font-weight:600}.neg{color:var(--suave)}
-.barra{height:8px;background:var(--linea);border-radius:4px;overflow:hidden;max-width:420px}.barra i{display:block;height:100%;background:var(--acento)}
-details{margin-top:1rem}summary{cursor:pointer;color:var(--suave)}tr.op td{background:color-mix(in srgb,var(--acento) 6%,var(--tarjeta))}
-</style></head><body>
-<header><b>Radar de instrumentos</b><a href="/">Publicaciones</a><a href="/corrida">Estado</a><a href="/watchlist">Lista de seguimiento</a>
-<a href="/parametros">Parámetros</a><a href="/ajustes">Ajustes</a><a href="/eventos">Eventos</a></header>
-<main>{% block cuerpo %}{% endblock %}</main></body></html>
+.filtros{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--suave)}
+input,select,textarea{font:inherit;font-size:15px;color:var(--tinta);background:var(--fondo);border:1px solid var(--linea);border-radius:8px;padding:10px 12px;min-height:44px}
+input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--acento);outline-offset:2px}
+.vacio{background:var(--sup);border:1px dashed var(--linea);border-radius:12px;padding:22px;color:var(--suave)}
+.pasos{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch}
+.paso{flex:1;min-width:150px;background:var(--fondo);border:1px solid var(--linea);border-radius:10px;padding:14px 16px}
+.paso.dest{border-color:var(--acento);background:color-mix(in srgb,var(--acento) 8%,var(--fondo))}
+.paso .k{font-size:12px;color:var(--suave)}.paso .v{font-family:var(--titulos);font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
+.paso .s{font-size:12px;color:var(--suave)}.flecha{align-self:center;color:var(--suave);font-size:20px}
+.bloque{padding:20px;display:flex;flex-direction:column;gap:14px}
+.barra{display:flex;height:28px;border-radius:6px;overflow:hidden;background:var(--fondo)}
+.barra i{display:block;height:100%}
+.leyenda{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px}
+.leyenda span{display:inline-flex;align-items:center;gap:8px}.leyenda i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.rejilla{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
+.fila{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+pre{white-space:pre-wrap;background:var(--fondo);border:1px solid var(--linea);padding:12px;border-radius:8px;font-size:13px;color:var(--suave);max-height:420px;overflow:auto}
+details summary{cursor:pointer;color:var(--suave)}
+.progreso{height:8px;background:var(--linea);border-radius:4px;overflow:hidden;max-width:420px}.progreso i{display:block;height:100%;background:var(--acento)}
+.pie{border-top:1px solid var(--linea);padding-top:18px;padding-bottom:28px;font-size:13px;color:var(--suave)}
+.oculto{display:none!important}
+@media (max-width:640px){.envol{padding:0 16px}h1{font-size:26px}.cab .meta{margin-left:0;width:100%}.paso .v{font-size:22px}.flecha{display:none}}
+</style>
+</head><body>
+<header class="cab"><div class="envol">
+<a class="marca" href="{{ e('hoy') }}">Radar de instrumentos</a>
+<nav aria-label="Secciones">
+<a href="{{ e('hoy') }}" class="{{ 'activa' if activa == 'hoy' }}">Hoy</a>
+<a href="{{ e('explorar') }}" class="{{ 'activa' if activa == 'explorar' }}">Explorar</a>
+{% if modo == 'local' %}<a href="{{ e('seguimiento') }}" class="{{ 'activa' if activa == 'seguimiento' }}">Seguimiento</a>
+<a href="{{ e('parametros') }}" class="{{ 'activa' if activa == 'parametros' }}">Parámetros</a>
+<a href="{{ e('ajustes') }}" class="{{ 'activa' if activa == 'ajustes' }}">Ajustes</a>{% endif %}
+<a href="{{ e('estado') }}" class="{{ 'activa' if activa == 'estado' }}">Estado</a>
+</nav>
+<span class="meta">{% if ultima %}Actualizado {{ ultima.fecha|fecha }}{% else %}Sin actualizar{% endif %}{% if trm %} · TRM {{ '{:,.0f}'.format(trm)|replace(',', '.') }}{% endif %}</span>
+</div></header>
+<main class="envol">{% block cuerpo %}{% endblock %}</main>
+<footer class="envol pie">Precios pedidos, no ventas cerradas. Costo puesto sin flete internacional: lo cotizas tú.{% if modo == 'estatico' and repo %} · <a href="https://github.com/{{ repo }}">Código y datos</a>{% endif %}</footer>
+{% block js %}{% endblock %}
+</body></html>

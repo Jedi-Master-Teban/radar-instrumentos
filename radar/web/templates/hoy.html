@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% import "_macros.html" as m %}
+{% block titulo %}Hoy · Radar de instrumentos{% endblock %}
+{% block cuerpo %}
+<h1 class="oculto">Hoy</h1>
+<section class="cifras" aria-label="Resumen">
+<a class="cifra si" href="{{ e('explorar') }}#reventa"><b>{{ resumen.reventa }}</b><span>Reventa con margen</span></a>
+<a class="cifra si" href="{{ e('explorar') }}#ganga"><b>{{ resumen.ganga }}</b><span>Gangas</span></a>
+<a class="cifra" href="{{ e('explorar') }}#posible"><b>{{ resumen.posible }}</b><span>Posible reventa</span></a>
+<a class="cifra" href="{{ e('explorar') }}#bajo"><b>{{ resumen.bajo }}</b><span>Bajo el mercado</span></a>
+<a class="cifra pri" href="{{ e('explorar') }}#pri"><b>{{ resumen.prioritarias }}</b><span>Neck-thru</span></a>
+<a class="cifra" href="{{ e('explorar') }}"><b>{{ resumen.evaluadas }}</b><span>Publicaciones evaluadas</span></a>
+</section>
+
+<section class="seccion">
+<div class="seccion-cab"><h2>Para mirar hoy</h2><span class="suave pequeno">Primero las de margen, luego gangas, posibles reventas y neck-thru</span></div>
+{% if destacadas %}<div class="tarjetas">{% for o in destacadas %}{{ m.tarjeta(o, e) }}{% endfor %}</div>
+{% elif total == 0 %}<div class="vacio">Todavía no hay publicaciones evaluadas. {% if modo == 'local' %}Agrega una captura en <code>datos/capturas/</code> o lanza una corrida desde <a href="{{ e('estado') }}">Estado</a>.{% else %}Aparecerán cuando entre la primera captura.{% endif %}</div>
+{% else %}<div class="vacio">Nada destacado hoy: ninguna publicación tiene margen, está bajo el mercado o trae una palabra prioritaria. <a href="{{ e('explorar') }}">Ver las {{ total }} en Explorar</a>.</div>{% endif %}
+</section>
+
+{% if resto %}
+<section class="seccion">
+<div class="seccion-cab"><h2>El resto del mercado</h2>
+<div class="chips">{% for c, nombre, n in categorias %}<a class="chip" href="{{ e('explorar') }}#cat-{{ c }}" style="text-decoration:none">{{ nombre }} · {{ n }}</a>{% endfor %}</div></div>
+<div class="caja tabla"><table>{{ m.cabecera_tabla() }}{% for o in resto %}{{ m.fila(o, e) }}{% endfor %}</table></div>
+<a href="{{ e('explorar') }}">Ver las {{ total }} en Explorar</a>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,43 @@
+name: Publicar sitio
+
+on:
+  push:
+    branches: [main]
+    paths: ["datos/**", "radar/**", ".github/workflows/sitio.yml"]
+  schedule:
+    - cron: "17 11 * * *"   # todos los días, 6:17 a. m. en Bogotá: TRM y precios de Colombia del día
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+      - name: Construir el sitio
+        run: python -m radar sitio --salida _site --repo "${{ github.repository }}"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  publicar:
+    needs: construir
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - id: despliegue
+        uses: actions/deploy-pages@v4

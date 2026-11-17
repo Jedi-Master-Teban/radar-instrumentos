@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block titulo %}Estado · Radar de instrumentos{% endblock %}
+{% block cuerpo %}
+{% if activa_corrida %}<meta http-equiv="refresh" content="6">{% endif %}
+<h1>Estado del radar</h1>
+{% if activa_corrida %}<div class="caja bloque"><b>Hay una corrida en curso.</b>{% if avance %}<span class="suave">Va en la publicación {{ avance[0] }} de {{ avance[1] }}. Esta página se actualiza sola.</span>
+<div class="progreso"><i style="width:{{ (100 * avance[0] / avance[1])|round|int }}%"></i></div>{% endif %}</div>{% endif %}
+
+<section class="seccion">
+<div class="seccion-cab"><h2>Última actualización</h2>{% if ultima %}<span class="suave pequeno">{{ ultima.fecha|fecha }} · {{ 'capturas importadas' if ultima.origen == 'importacion' else 'corrida con el modelo de NIM' }}</span>{% endif %}</div>
+{% if ultima %}<div class="cifras">
+<div class="cifra"><b>{{ ultima.listings }}</b><span>Publicaciones leídas</span></div>
+<div class="cifra si"><b>{{ ultima.oportunidades }}</b><span>Oportunidades</span></div>
+<div class="cifra"><b>{{ ultima.detalle.get('sin_margen', 0) }}</b><span>Valoradas sin margen</span></div>
+<div class="cifra {{ 'pri' if ultima.detalle.get('sin_valoracion_us', 0) }}"><b>{{ ultima.detalle.get('sin_valoracion_us', 0) }}</b><span>Sin comparables en EE. UU.</span></div>
+{% if ultima.detalle.get('sin_normalizar', 0) %}<div class="cifra pri"><b>{{ ultima.detalle.sin_normalizar }}</b><span>El modelo no las identificó</span></div>{% endif %}
+</div>{% else %}<div class="vacio">Aún no hay corridas ni capturas importadas.</div>{% endif %}
+</section>
+
+<section class="seccion"><h2>Fuentes</h2>
+<div class="caja tabla"><table>
+<tr><th>Fuente</th><th>Búsqueda</th><th>Fecha</th><th class="n">Publicaciones</th></tr>
+{% for x in capturas %}<tr><td>{{ x.fuente|capitalize }}<small>{{ x.archivo }}</small></td><td>{{ x.consulta }}{% if x.nota %}<small>{{ x.nota }}</small>{% endif %}</td><td>{{ x.capturado }}</td><td class="n">{{ x.n }}</td></tr>
+{% else %}<tr><td colspan="4" class="suave">No hay capturas en datos/capturas/.</td></tr>{% endfor %}
+<tr><td>Tiendas de Colombia<small>{{ tiendas|join(', ') }}</small></td><td>Precios de referencia por modelo</td><td>{{ colombia.fecha|fecha if colombia else '—' }}</td>
+<td class="n">{% if colombia %}{{ colombia.con_precio_en_colombia }} de {{ colombia.modelos }}<small>modelos con precio</small>{% else %}<span class="suave">sin consultar</span>{% endif %}</td></tr>
+</table></div></section>
+
+{% if problemas %}<section class="seccion"><h2>Problemas en la última corrida</h2>
+<div class="caja tabla"><table><tr><th>Qué pasó</th><th>Dónde</th></tr>
+{% for p in problemas %}<tr><td>{{ {'lector_bloqueado': 'El sitio bloqueó la lectura', 'lector_error': 'Error al leer', 'lector_sin_resultados': 'No devolvió resultados', 'modelo_respuesta_invalida': 'Respuesta inválida del modelo de NIM', 'telegram_error': 'Telegram no aceptó el mensaje'}.get(p.tipo, p.tipo) }}</td><td>{{ p.fuente }}</td></tr>{% endfor %}
+</table></div></section>{% endif %}
+
+<section class="seccion"><h2>Supuestos de las cuentas</h2>
+<div class="caja bloque"><div class="pares" style="max-width:620px">
+<div class="par"><span>Margen mínimo</span><span>{{ p.margen_objetivo|pct }}</span></div>
+<div class="par"><span>Impuesto a las ventas en EE. UU. · margen cambiario</span><span>{{ p.sales_tax_us|pct }} · {{ '%.1f'|format(p.margen_cambiario * 100) }} %</span></div>
+<div class="par"><span>Arancel · IVA en Colombia</span><span>{{ p.arancel|pct }} · {{ p.iva|pct }}</span></div>
+<div class="par"><span>Flete supuesto (guitarra · bajo · pedal)</span><span>{{ p.flete_supuesto_usd.guitarra|usd }} · {{ p.flete_supuesto_usd.bajo|usd }} · {{ p.flete_supuesto_usd.pedal|usd }}</span></div>
+<div class="par"><span>Negociación en EE. UU. · regateo en Colombia</span><span>{{ p.descuento_negociacion_us|pct }} · {{ p.regateo_co|pct }}</span></div>
+<div class="par"><span>Rebaja máxima que se pide al vendedor</span><span>{{ p.rebaja_maxima_esperada|pct }}</span></div>
+<div class="par"><span>Ganga: descuento mínimo frente al usado</span><span>{{ p.ganga_descuento_min|pct }}</span></div>
+</div>{% if modo != 'local' and repo %}<p class="suave pequeno" style="margin:0">Se cambian en <a href="https://github.com/{{ repo }}/edit/main/datos/parametros.json" target="_blank" rel="noopener">datos/parametros.json</a>.</p>{% endif %}</div>
+</section>
+
+{% if modo == 'local' %}
+<section class="seccion"><h2>Acciones</h2>
+{% if not nim %}<p class="aviso" style="margin:0">Falta la clave de NVIDIA NIM: guárdala en <a href="{{ e('ajustes') }}">Ajustes</a>. Solo hace falta para las corridas con el modelo.</p>{% endif %}
+{% if not activa_corrida %}<form class="botones" method="post" action="/corrida">
+<button class="prim" name="modo" value="colombia">Actualizar precios de Colombia</button>
+<button name="modo" value="prueba">Corrida de prueba con NIM</button><button name="modo" value="completa">Corrida completa con NIM</button></form>
+<p class="suave pequeno" style="margin:0">Las capturas de <code>datos/capturas/</code> se importan solas al abrir Hoy. Ver también <a href="{{ e('eventos') }}">todos los eventos</a>.</p>{% endif %}
+{% if registro %}<details><summary>Registro técnico de la última corrida</summary><pre>{{ registro }}</pre></details>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

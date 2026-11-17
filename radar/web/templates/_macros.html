@@ -1,0 +1,53 @@
+{% macro chips(o) -%}
+<div class="chips"><span class="chip {{ o.clase }}">{{ o.corto }}</span>{% if o.prioritario %}<span class="chip pri">Neck-thru</span>{% endif %}{% if o.confianza_co == 'baja' %}<span class="chip">Colombia estimado</span>{% endif %}{% if o.banderas %}<span class="chip pri">Revisar</span>{% endif %}{% if o.estado != 'nueva' %}<span class="chip">{{ o.estado }}</span>{% endif %}</div>
+{%- endmacro %}
+
+{% macro meta(o) -%}
+{{ o.normalizado.marca }} · {{ o.listing.plataforma|capitalize }} · {{ o.normalizado.estado }}{% if o.dias_publicado is not none %} · {{ o.dias_publicado }} días publicada{% endif %}{% if o.listing.acepta_ofertas %} · acepta ofertas{% endif %}
+{%- endmacro %}
+
+{% macro tarjeta(o, e) -%}
+<article class="tarjeta" data-id="{{ o.id }}">
+<div class="foto">{% if o.listing.fotos %}<img src="{{ o.listing.fotos[0] }}" alt="" loading="lazy">{% else %}{{ o.normalizado.marca }} {{ o.normalizado.modelo }}{% endif %}</div>
+<div class="cuerpo">
+{{ chips(o) }}
+<div><h3>{{ o.normalizado.modelo }}</h3><div class="suave pequeno">{{ meta(o) }}</div></div>
+<div class="pares">
+<div class="par"><span>Precio pedido</span><span>{{ o.listing.precio_usd|usd }}{% if o.descuento_us is not none %}<small>{% if o.descuento_us >= 0 %}{{ o.descuento_us|pct }} bajo el mercado{% else %}{{ (-o.descuento_us)|pct }} sobre el mercado{% endif %}</small>{% endif %}</span></div>
+<div class="par"><span>Oferta sugerida</span><span>{% if o.oferta %}{{ o.oferta.apertura_usd|usd }} → {{ o.oferta.techo_usd|usd }}<small>apertura → techo</small>{% else %}—<small>{{ 'faltan comparables' if not o.valoracion_us else 'muy lejos del tope' }}</small>{% endif %}</span></div>
+<div class="par"><span>Referencia Colombia</span><span>{% if o.precio_co_cop is defined %}{{ o.precio_co_cop|cop }}<small>{{ 'estimada' if o.confianza_co == 'baja' else o.origen_co }}</small>{% else %}—{% endif %}</span></div>
+<div class="par"><span>Venta sugerida</span><span>{% if o.venta %}{{ o.venta.lista_cop|cop }}<small>piso {{ o.venta.piso_cop|cop }}</small>{% else %}—<small>define tú el precio</small>{% endif %}</span></div>
+</div>
+<div class="pie-tarjeta"><span class="suave pequeno">{% if o.margen_en_retiro is defined %}Margen comprando al techo{% if o.rebaja_necesaria and o.rebaja_necesaria > 0.005 %} · pide −{{ o.rebaja_necesaria|pct }}{% endif %}{% elif o.prioritario %}Palabra prioritaria en el título{% else %}Sin margen calculado{% endif %}</span>
+<span class="margen {{ '' if o.hay_margen else 'neg' }}">{% if o.margen_en_retiro is defined %}{{ o.margen_en_retiro|pct }}{% else %}—{% endif %}</span></div>
+<div class="botones"><a class="boton prim" href="{{ o.listing.url }}" target="_blank" rel="noopener">Ver publicación</a><a class="boton" href="{{ e('detalle', o.id) }}">Detalle</a></div>
+</div></article>
+{%- endmacro %}
+
+{% macro fila(o, e) -%}
+<tr data-cat="{{ o.categoria }}" data-clase="{{ o.clase }}" data-marca="{{ o.normalizado.marca }}" data-plat="{{ o.listing.plataforma }}" data-estado="{{ o.estado }}" data-texto="{{ (o.normalizado.marca ~ ' ' ~ o.normalizado.modelo ~ ' ' ~ o.listing.titulo)|lower }}"
+ data-precio="{{ o.listing.precio_usd }}" data-desc="{{ o.descuento_us if o.descuento_us is not none else -9 }}" data-margen="{{ o.margen_en_retiro if o.margen_en_retiro is defined else -9 }}" data-orden="{{ o.orden }}" data-pri="{{ 1 if o.prioritario else 0 }}">
+<td><a class="tit" href="{{ e('detalle', o.id) }}">{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</a>{% if o.prioritario %} <span class="chip pri">Neck-thru</span>{% endif %}<small>{{ o.listing.titulo[:64] }} · <a href="{{ o.listing.url }}" target="_blank" rel="noopener">{{ o.listing.plataforma|capitalize }} ↗</a></small></td>
+<td><span class="chip {{ o.clase }}">{{ o.corto }}</span></td>
+<td class="n">{{ o.listing.precio_usd|usd }}</td>
+<td class="n">{% if o.valoracion_us %}{{ o.valoracion_us.mediana_usd|usd }}<small>{{ o.valoracion_us.n }} refs · nuevo {{ o.valoracion_us.nuevo_usd|usd }}</small>{% else %}<span class="suave">—</span><small>menos de 3 refs</small>{% endif %}</td>
+<td class="n {{ 'pos' if o.descuento_us is not none and o.descuento_us >= 0.10 else 'neg' }}">{% if o.descuento_us is none %}—{% elif o.descuento_us >= 0 %}−{{ o.descuento_us|pct }}{% else %}+{{ (-o.descuento_us)|pct }}{% endif %}</td>
+<td class="n">{% if o.precio_co_cop is defined %}{{ o.precio_co_cop|cop }}<small>{{ 'estimada' if o.confianza_co == 'baja' else o.origen_co }}</small>{% else %}<span class="suave">—</span>{% endif %}</td>
+<td class="n">{% if o.oferta %}{{ o.oferta.apertura_usd|usd }} → {{ o.oferta.techo_usd|usd }}{% else %}<span class="suave">—</span>{% endif %}</td>
+<td class="n">{% if o.venta %}{{ o.venta.lista_cop|cop }}<small>piso {{ o.venta.piso_cop|cop }}</small>{% else %}<span class="suave">—</span>{% endif %}</td>
+<td class="n">{% if o.margen_en_retiro is defined %}<span class="{{ 'pos' if o.hay_margen else 'neg' }}">{{ o.margen_en_retiro|pct }}</span>{% if o.rebaja_necesaria and o.rebaja_necesaria > 0.005 %}<small>pide −{{ o.rebaja_necesaria|pct }}</small>{% endif %}{% else %}<span class="suave">—</span>{% endif %}</td>
+</tr>
+{%- endmacro %}
+
+{% macro cabecera_tabla(ordenable=False) -%}
+<tr>
+<th>Publicación</th><th>Veredicto</th>
+<th class="n">{% if ordenable %}<button type="button" data-orden="precio">Pedido</button>{% else %}Pedido{% endif %}</th>
+<th class="n">EE. UU. usado<small>mediana ajustada</small></th>
+<th class="n">{% if ordenable %}<button type="button" data-orden="desc">Frente al mercado</button>{% else %}Frente al mercado{% endif %}</th>
+<th class="n">Colombia<small>referencia</small></th>
+<th class="n">Oferta<small>apertura → techo</small></th>
+<th class="n">Venta<small>lista · piso</small></th>
+<th class="n">{% if ordenable %}<button type="button" data-orden="margen">Margen</button>{% else %}Margen{% endif %}<small>al techo</small></th>
+</tr>
+{%- endmacro %}

@@ -1,4 +1,4 @@
 {% extends "base.html" %}{% block cuerpo %}
-<h1>Eventos</h1><table><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th></tr>
-{% for e in eventos %}<tr><td>{{ e.fecha }}</td><td>{{ e.tipo }}</td><td>{{ e.detalle }}</td></tr>{% else %}<tr><td class="suave">Sin eventos.</td></tr>{% endfor %}</table>
+<h1>Eventos</h1><div class="caja tabla"><table><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th></tr>
+{% for ev in eventos %}<tr><td>{{ ev.fecha }}</td><td>{{ ev.tipo }}</td><td>{{ ev.detalle }}</td></tr>{% else %}<tr><td class="suave">Sin eventos.</td></tr>{% endfor %}</table></div>
 {% endblock %}

@@ -28,24 +28,27 @@ def cliente(tmp_path, monkeypatch):
     return TestClient(crear_app(aj, carpeta_capturas=tmp_path / 'capturas')), aj
 
 
-def test_lista_muestra_reventa_y_ganga(cliente):
+def test_hoy_muestra_reventa_y_ganga_en_tarjetas(cliente):
     c, _ = cliente
     r = c.get("/")
-    assert r.status_code == 200 and "Fender Player Stratocaster" in r.text and "Strandberg Boden Plini" in r.text
-    assert "no está" in r.text and "Reventa con margen" in r.text and "Ganga (no está en Colombia)" in r.text
+    assert r.status_code == 200 and "Player Stratocaster" in r.text and "Boden Plini" in r.text
+    assert 'chip reventa">Reventa' in r.text and 'chip ganga">Ganga' in r.text and "Colombia estimado" in r.text
+    assert r.text.count('class="tarjeta"') == 2 and 'href="/oportunidad/1"' in r.text
 
 
-def test_filtro_por_tipo(cliente):
+def test_explorar_trae_todo_para_filtrar(cliente):
     c, _ = cliente
-    r = c.get("/?tipo=ganga")
-    assert "Strandberg" in r.text and "Fender Player" not in r.text
+    t = c.get("/explorar").text
+    assert 'data-clase="ganga"' in t and 'data-clase="reventa"' in t and "Solo oportunidades" in t
+    assert 'data-marca="Strandberg"' in t and 'class="activa">Explorar' in t.replace('href="/explorar" ', "")
 
 
 def test_detalle_y_cambio_de_estado(cliente):
     c, _ = cliente
-    assert "Mensaje de oferta" in c.get("/oportunidad/1").text
+    t = c.get("/oportunidad/1").text
+    assert "Mensaje de oferta" in t and "Venta en Colombia" in t and "Publica en" in t
     assert c.post("/oportunidad/1/estado", data={"estado": "ofertada"}, follow_redirects=False).status_code == 303
-    assert "Fender Player" not in c.get("/").text and "Fender Player" in c.get("/?estado=ofertada").text
+    assert '<span class="chip">ofertada</span>' in c.get("/oportunidad/1").text
     assert c.post("/oportunidad/1/estado", data={"estado": "robada"}).status_code == 422
     assert c.get("/oportunidad/999").status_code == 404
 
@@ -53,13 +56,17 @@ def test_detalle_y_cambio_de_estado(cliente):
 def test_detalle_de_ganga_explica_que_no_esta_en_colombia(cliente):
     c, _ = cliente
     t = c.get("/oportunidad/2").text
-    assert "no aparece en Colombia" in t and "inusualmente bajo" in t
+    assert "no aparece en tiendas colombianas" in t and "inusualmente bajo" in t
 
 
-def test_flete_real_recalcula_margen(cliente):
+def test_flete_real_mueve_el_techo_y_se_guarda(cliente):
     c, _ = cliente
+    antes = c.get("/oportunidad/1").text
     c.post("/oportunidad/1/flete", data={"flete_real_cop": "900000"})
-    assert "Margen con flete real: <b>18 %</b>" in c.get("/oportunidad/1").text
+    t = c.get("/oportunidad/1").text
+    assert 'id="i-flete" min="0" step="10000" value="900000"' in t
+    techo = lambda html: html.split('id="v-techo">')[1].split("<")[0]
+    assert techo(antes) != techo(t) and 'id="v-margen">25 %' in t  # el techo baja para conservar el margen
     assert c.post("/oportunidad/1/flete", data={"flete_real_cop": "-5"}).status_code == 422
 
 
@@ -114,7 +121,7 @@ def test_corrida_desde_el_tablero(tmp_path, monkeypatch):
         (a.home / "corrida.log").write_text("ebay: 12 publicaciones\n")
         return 4242
     c = TestClient(crear_app(aj, lanzar=lanzar, vivo=lambda pid: pid in vivos, carpeta_capturas=tmp_path / 'capturas'))
-    assert "Todavía no hay datos" in c.get("/").text  # lista vacía explica qué hacer
+    assert "Todavía no hay publicaciones evaluadas" in c.get("/").text  # lista vacía explica qué hacer
     assert "Aún no hay corridas" in c.get("/corrida").text
     assert c.post("/corrida", data={"modo": "prueba"}, follow_redirects=False).status_code == 303
     t = c.get("/corrida").text
@@ -122,7 +129,7 @@ def test_corrida_desde_el_tablero(tmp_path, monkeypatch):
     c.post("/corrida", data={"modo": "completa"})  # ya hay una: no lanza otra
     assert lanzadas == [True]
     vivos.clear()
-    assert "Corrida completa" in c.get("/corrida").text
+    assert "Corrida completa con NIM" in c.get("/corrida").text
     assert c.post("/corrida", data={"modo": "otra"}).status_code == 422
 
 
@@ -155,6 +162,6 @@ def test_tablero_importa_capturas_del_repo_al_abrir(tmp_path, monkeypatch):
     (carpeta / "a.json").write_text(js.dumps({"fuente": "reverb", "publicaciones": pubs}))
     c = TestClient(crear_app(aj, carpeta_capturas=carpeta))
     t = c.get("/").text
-    assert "Guitarras" in t and 'href="https://reverb.com/item/0"' in t and "Ganga (no está en Colombia)" in t
-    assert "A precio de mercado" in t and "neck-thru" in t and "capturas importadas" in c.get("/corrida").text
-    assert "Solo oportunidades" in t and "NX 6 #1" not in c.get("/?ver=oportunidades").text
+    assert 'href="https://reverb.com/item/0"' in t and 'chip ganga">Ganga' in t and "Guitarras · 5" in t
+    x = c.get("/explorar").text
+    assert "A precio de mercado" in x and "Neck-thru" in x and "capturas importadas" in c.get("/corrida").text

@@ -30,3 +30,10 @@ Nombre sugerido: `AAAA-MM-DD-<fuente>-<búsqueda>.json`. Para actualizar una bú
 - `categoria` por publicación es opcional (guitarra, bajo, pedal, cuerdas); si falta, usa la del archivo.
 - `senales`: frases del vendedor que indiquen urgencia ("must sell", "OBO").
 - Solo publicaciones de vendedores en EE. UU. con envío.
+
+# Otros archivos de datos
+
+- `parametros.json`: valores que usa el sitio publicado. Las claves que empiezan por `_` son notas.
+- `referencias_co.json`: precios de venta en Colombia que tú conoces, por modelo exacto (mismo texto que en
+  las capturas). Mandan sobre la estimación automática:
+  `[{"marca": "Strandberg", "modelo": "Boden Prog NX 6", "usado_cop": 7500000}]`
