@@ -87,19 +87,48 @@ def escribir(con, salida: Path, datos: Path, repo: str = "") -> int:
     return len(ops) + 3
 
 
+def vigilar(nombre: str, fuente, estado: dict):
+    """Cuenta cómo responde cada tienda y deja de consultarla tras 3 errores sin ninguna respuesta buena."""
+    from .collectors.base import LectorBloqueado
+
+    st = estado.setdefault(nombre, {"con_resultados": 0, "sin_resultados": 0, "errores": 0, "ultimo_error": ""})
+
+    def consultar(consulta):
+        if st["errores"] >= 3 and st["con_resultados"] + st["sin_resultados"] == 0:
+            raise LectorBloqueado(f"{nombre}: omitida tras 3 errores seguidos")
+        try:
+            r = fuente(consulta)
+        except Exception as e:
+            st["errores"] += 1
+            st["ultimo_error"] = f"{type(e).__name__}: {e}"[:160]
+            raise
+        st["con_resultados" if r else "sin_resultados"] += 1
+        return r
+    consultar.__wrapped__ = fuente
+    return consultar
+
+
 def construir(salida: Path, datos: Path = DATOS, hoy: date | None = None, trm: float | None = None,
               colombia: bool = True, repo: str = "", log=lambda m: None) -> dict:
     hoy = hoy or date.today()
     con = db.conectar(":memory:")
-    tiendas = None
+    tiendas, estado_tiendas = None, {}
     if colombia:
         from .collectors import tiendas as t
         from .collectors.http import ClienteHttp
 
-        http = ClienteHttp()
+        import httpx
+
+        from .collectors.http import AGENTE
+
+        http = ClienteHttp(httpx.Client(timeout=10, follow_redirects=True, headers={"User-Agent": AGENTE}), pausa=1.0)
         lista = _leer_json(datos / "parametros.json", {}).get("tiendas_co") or db.PARAMETROS_DEFECTO["tiendas_co"]
-        tiendas = {x["nombre"]: (lambda c, x=x: t.buscar_tienda_co(http, x, c)) for x in lista}
+        tiendas = {x["nombre"]: vigilar(x["nombre"], lambda c, x=x: t.buscar_tienda_co(http, x, c), estado_tiendas)
+                   for x in lista}
     trm = preparar(con, datos, hoy, trm, tiendas, log)
+    if estado_tiendas:
+        db.evento(con, "colombia_tiendas", json.dumps(estado_tiendas, ensure_ascii=False))
+        log("Tiendas: " + json.dumps(estado_tiendas, ensure_ascii=False))
     paginas = escribir(con, salida, datos, repo)
     r = vistas.resumen(vistas.cargar_ops(con)) | {"paginas": paginas, "trm": trm}
     log(json.dumps(r, ensure_ascii=False))

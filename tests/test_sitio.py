@@ -68,3 +68,37 @@ def test_cuenta_del_navegador_coincide_con_la_del_radar(con):
     assert c["apertura"] == approx(o["oferta"]["apertura_usd"], abs=0.01)
     assert c["margen"] == approx(o["margen_en_retiro"]) and c["piso"] == approx(o["venta"]["piso_cop"])
     assert c["lista"] == approx(o["venta"]["lista_cop"]) and c["flete_max"] == approx(o["flete_maximo_cop"])
+
+
+def test_vigilar_cuenta_y_deja_de_insistir():
+    import pytest
+
+    from radar.collectors.base import LectorBloqueado
+    from radar.sitio import vigilar
+    estado, llamadas = {}, []
+
+    def caida(c):
+        llamadas.append(c)
+        raise TimeoutError("lenta")
+    f = vigilar("Lenta", caida, estado)
+    for _ in range(5):
+        with pytest.raises((TimeoutError, LectorBloqueado)):
+            f("x")
+    assert len(llamadas) == 3 and estado["Lenta"]["errores"] == 3 and "lenta" in estado["Lenta"]["ultimo_error"]
+    g = vigilar("Buena", lambda c: [1] if c == "a" else [], estado)
+    g("a"), g("b")
+    assert estado["Buena"] == {"con_resultados": 1, "sin_resultados": 1, "errores": 0, "ultimo_error": ""}
+
+
+def test_estado_muestra_cada_tienda(tmp_path, monkeypatch):
+    import radar.sitio as sitio
+    from radar.collectors import tiendas
+
+    def falsa(http, t, consulta):
+        if t["nombre"] == "Ortizo":
+            raise TimeoutError("sin respuesta")
+        return []
+    monkeypatch.setattr(tiendas, "buscar_tienda_co", falsa)
+    sitio.construir(tmp_path / "s", datos(tmp_path / "d"), HOY, trm=3316.7, colombia=True)
+    t = (tmp_path / "s" / "estado.html").read_text()
+    assert "no respondió" in t and "sin respuesta" in t and "La Colonial" in t and "0 de 2" in t

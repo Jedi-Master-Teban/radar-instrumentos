@@ -34,6 +34,11 @@ RUTAS_ESTATICO = {"hoy": "index.html", "explorar": "explorar.html", "estado": "e
                   "detalle": "o-{}.html"}
 
 
+def cop_redondo(x) -> str:
+    """Pesos redondeados a miles: los precios estimados no tienen precisión de pesos sueltos."""
+    return cop(None if x is None else round(x, -3))
+
+
 def pct(x) -> str:
     return "—" if x is None else f"{x * 100:.0f} %"
 
@@ -44,7 +49,7 @@ def millones(x) -> str:
 
 def entorno() -> Environment:
     env = Environment(loader=FileSystemLoader(str(PLANTILLAS)), autoescape=select_autoescape(["html"]))
-    env.filters.update(cop=cop, usd=usd, pct=pct, millones=millones,
+    env.filters.update(cop=cop_redondo, usd=usd, pct=pct, millones=millones,
                        fecha=lambda s: "—" if not s else str(s)[:16].replace("T", " "))
     return env
 
@@ -112,7 +117,7 @@ def resumen(ops: list[dict]) -> dict:
     vivas = [o for o in ops if o["estado"] != "descartada"]
     cuenta = lambda c: sum(o["clase"] == c for o in vivas)
     return {"reventa": cuenta("reventa"), "ganga": cuenta("ganga"), "posible": cuenta("posible"),
-            "bajo": cuenta("bajo"), "prioritarias": sum(bool(o.get("prioritario")) for o in vivas),
+            "bajo": sum((o.get("descuento_us") or 0) >= 0.10 for o in vivas), "prioritarias": sum(bool(o.get("prioritario")) for o in vivas),
             "evaluadas": len(vivas)}
 
 
@@ -141,9 +146,15 @@ def colombia_info(con) -> dict | None:
     if not f:
         return None
     try:
-        return {"fecha": f["fecha"], **json.loads(f["detalle"])}
+        info = {"fecha": f["fecha"], **json.loads(f["detalle"])}
     except ValueError:
         return None
+    t = con.execute("select detalle from eventos where tipo = 'colombia_tiendas' order by id desc limit 1").fetchone()
+    try:
+        info["tiendas"] = json.loads(t["detalle"]) if t else {}
+    except ValueError:
+        info["tiendas"] = {}
+    return info
 
 
 def capturas_info(carpeta: Path) -> list[dict]:

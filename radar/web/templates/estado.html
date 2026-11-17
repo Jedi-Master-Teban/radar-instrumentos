@@ -24,6 +24,8 @@
 {% else %}<tr><td colspan="4" class="suave">No hay capturas en datos/capturas/.</td></tr>{% endfor %}
 <tr><td>Tiendas de Colombia<small>{{ tiendas|join(', ') }}</small></td><td>Precios de referencia por modelo</td><td>{{ colombia.fecha|fecha if colombia else '—' }}</td>
 <td class="n">{% if colombia %}{{ colombia.con_precio_en_colombia }} de {{ colombia.modelos }}<small>modelos con precio</small>{% else %}<span class="suave">sin consultar</span>{% endif %}</td></tr>
+{% if colombia and colombia.tiendas %}{% for nombre, st in colombia.tiendas.items() %}<tr><td colspan="3"><span class="suave">↳</span> {{ nombre }}{% if st.errores %}<small class="aviso">{{ st.ultimo_error }}</small>{% endif %}</td>
+<td class="n">{% if st.errores and not (st.con_resultados + st.sin_resultados) %}<span class="aviso">no respondió</span>{% else %}respondió{% endif %}<small>{{ st.con_resultados }} con resultados · {{ st.sin_resultados }} sin · {{ st.errores }} errores</small></td></tr>{% endfor %}{% endif %}
 </table></div></section>
 
 {% if problemas %}<section class="seccion"><h2>Problemas en la última corrida</h2>
