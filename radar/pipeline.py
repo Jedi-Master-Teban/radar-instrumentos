@@ -7,9 +7,9 @@ from datetime import date
 
 from . import db
 from .collectors.base import LectorBloqueado
-from .costing import costo_puesto, flete_maximo, ingreso_neto, margen
+from .costing import cuenta, flete_maximo, precio_techo, venta
 from .models import ESTADOS_ACEPTADOS, Listing
-from .offer import precio_techo, proponer
+from .offer import proponer
 from .scoring import puntaje, puntaje_ganga
 from .valuation import estimar_co, precio_reventa_co, referencia_co, referencia_us
 
@@ -76,7 +76,7 @@ def _evaluar(con, lid: int, l: Listing, modelo, fuentes_us: dict, fuentes_co: di
         datos = dict(
             listing=asdict(l) | {"fecha_publicacion": l.fecha_publicacion.isoformat() if l.fecha_publicacion else None},
             normalizado=asdict(n), valoracion_us=None, referencia_co=None, oferta=None, descuento_us=None,
-            costo=asdict(costo_puesto(l.precio_usd, l.envio_us_usd, trm, p)), senales=list(n.senales_motivado),
+            costo=asdict(cuenta(l.precio_usd, l.envio_us_usd, n.categoria, trm, p)), senales=list(n.senales_motivado),
             dias_publicado=(hoy - l.fecha_publicacion).days if l.fecha_publicacion else None,
             veredicto="Sin comparables suficientes", prioritario=bool(prioritarias), banderas=[], comps_us=comps_us,
             comps_co=[], trm=trm)
@@ -93,9 +93,8 @@ def _evaluar(con, lid: int, l: Listing, modelo, fuentes_us: dict, fuentes_co: di
 
     senales = list(n.senales_motivado) + (["rebajado"] if db.rebajas(con, lid) else [])
     dias = (hoy - l.fecha_publicacion).days if l.fecha_publicacion else None
-    costo = costo_puesto(l.precio_usd, l.envio_us_usd, trm, p)
+    costo = cuenta(l.precio_usd, l.envio_us_usd, n.categoria, trm, p)
     descuento_us = 1 - l.precio_usd / val.mediana_usd
-    flete_sup_cop = p["flete_supuesto_usd"].get(n.categoria, 0) * trm
     reventa = precio_reventa_co(ref, p)
     if reventa is not None:
         confianza = "alta" if reventa[2] in ("manual", "usados en Colombia") else "media"
@@ -104,24 +103,18 @@ def _evaluar(con, lid: int, l: Listing, modelo, fuentes_us: dict, fuentes_co: di
 
     tipo = None
     precio_co, n_co, origen = reventa
-    ingreso = ingreso_neto(precio_co, p)
-    techo = precio_techo(precio_co, l.envio_us_usd, n.categoria, trm, p)
-    oferta = proponer(l.precio_usd, techo, val)
-    compra = oferta.retiro_usd if oferta else l.precio_usd  # precio al que se supone la compra
-    costo_compra = costo_puesto(compra, l.envio_us_usd, trm, p)
-    total_compra = costo_compra.total_cop + flete_sup_cop
-    m = margen(ingreso, costo_compra.total_cop, flete_sup_cop)
-    # Solo cuenta si el margen se alcanza con una rebaja realista sobre el precio pedido
-    hay_margen = (oferta is not None and m >= p["margen_objetivo"] - 1e-9
-                  and oferta.retiro_usd >= (1 - p["rebaja_maxima_esperada"]) * l.precio_usd - 1e-9)
-    lista = precio_co / (1 - p["regateo_co"])
+    escenarios = {str(round(c * 100)): _escenario(precio_co, l, n.categoria, val, trm, p, c)
+                  for c in sorted(set(p.get("comisiones_escenario", []) + [p["comision_canal"]]))}
+    e = escenarios[str(round(p["comision_canal"] * 100))]
+    oferta = e["oferta"]
+    m, hay_margen, compra = e["margen"], e["hay_margen"], e["compra_usd"]
     datos: dict = dict(
         precio_co_cop=precio_co, origen_co=origen, confianza_co=confianza, margen_en_retiro=m, hay_margen=hay_margen,
-        compra_supuesta_usd=compra, rebaja_necesaria=1 - compra / l.precio_usd, margen_al_pedido=margen(ingreso, costo.total_cop, flete_sup_cop),
-        flete_maximo_cop=flete_maximo(ingreso, costo_compra.total_cop, p),
+        compra_supuesta_usd=compra, rebaja_necesaria=1 - compra / l.precio_usd, margen_al_pedido=e["margen_pedido"],
+        flete_maximo_usd=e["flete_maximo_usd"], comision=p["comision_canal"],
+        escenarios={k: {**v, "oferta": asdict(v["oferta"]) if v["oferta"] else None} for k, v in escenarios.items()},
         # precios para venderla en Colombia: publicar en "lista", cerrar cerca de "objetivo", nunca bajo "piso"
-        venta=dict(lista_cop=lista, objetivo_cop=precio_co, piso_cop=total_compra * (1 + p["margen_objetivo"]),
-                   margen_lista=ingreso_neto(lista, p) / total_compra - 1))
+        venta=dict(lista_cop=precio_co / (1 - p["regateo_co"]), objetivo_cop=precio_co, piso_cop=e["piso_cop"]))
     if hay_margen and confianza != "baja":
         tipo = "reventa"
         punt = puntaje(m, val.n, n_co, ref.manual, senales, dias)
@@ -164,9 +157,10 @@ def _evaluar(con, lid: int, l: Listing, modelo, fuentes_us: dict, fuentes_co: di
     datos.update(
         listing=asdict(l) | {"fecha_publicacion": l.fecha_publicacion.isoformat() if l.fecha_publicacion else None},
         normalizado=asdict(n), valoracion_us=asdict(val), referencia_co=asdict(ref) | {"fecha": ref.fecha.isoformat()},
-        costo=asdict(costo), oferta=asdict(oferta) if oferta else None, descuento_us=descuento_us, senales=senales,
+        costo=asdict(cuenta(compra, l.envio_us_usd, n.categoria, trm, p)), costo_pedido=asdict(costo),
+        oferta=asdict(oferta) if oferta else None, descuento_us=descuento_us, senales=senales,
         dias_publicado=dias, veredicto=veredicto, prioritario=bool(prioritarias),
-        banderas=banderas, comps_us=comps_us, comps_co=comps_co, trm=trm, flete_supuesto_cop=flete_sup_cop)
+        banderas=banderas, comps_us=comps_us, comps_co=comps_co, trm=trm, flete_supuesto_usd=costo.flete_usd)
     con.execute(
         "insert into oportunidades(listing_id, tipo, puntaje, datos, creada) values(?,?,?,?,?) "
         "on conflict(listing_id) do update set tipo=excluded.tipo, puntaje=excluded.puntaje, datos=excluded.datos, "
@@ -174,6 +168,32 @@ def _evaluar(con, lid: int, l: Listing, modelo, fuentes_us: dict, fuentes_co: di
     con.commit()
     return resultado
 
+
+
+def _escenario(precio_co: float, l: Listing, categoria: str, val, trm: float, p: dict, com: float) -> dict:
+    """Techo, oferta y ganancia con una comisión del vendedor en Colombia. Cifras en USD y COP."""
+    techo = precio_techo(precio_co, l.envio_us_usd, categoria, trm, p, com)
+    oferta = proponer(l.precio_usd, techo, val)
+    compra = oferta.retiro_usd if oferta else l.precio_usd  # precio al que se supone la compra
+    c_compra = cuenta(compra, l.envio_us_usd, categoria, trm, p)
+    v = venta(precio_co, c_compra, com, p)
+    v_pedido = venta(precio_co, cuenta(l.precio_usd, l.envio_us_usd, categoria, trm, p), com, p)
+    v_apertura = (venta(precio_co, cuenta(oferta.apertura_usd, l.envio_us_usd, categoria, trm, p), com, p)
+                  if oferta else None)
+    # Solo cuenta si el margen se alcanza con una rebaja realista sobre el precio pedido
+    hay = (oferta is not None and v.margen >= p["margen_objetivo"] - 1e-9
+           and oferta.retiro_usd >= (1 - p["rebaja_maxima_esperada"]) * l.precio_usd - 1e-9)
+    # piso: el menor precio de venta que conserva el margen objetivo pagando la comisión
+    piso = c_compra.total_cop * (1 + p["margen_objetivo"]) / (1 - com)
+    return dict(comision=com, techo_usd=techo, oferta=oferta, compra_usd=compra, costo_cop=c_compra.total_cop,
+                lineas=[asdict(x) for x in c_compra.lineas],
+                costo_usd=c_compra.total_usd, comision_cop=v.comision_cop, comision_usd=v.comision_usd,
+                neto_cop=v.neto_cop, neto_usd=v.neto_usd, margen=v.margen, hay_margen=hay,
+                neto_pedido_cop=v_pedido.neto_cop, neto_pedido_usd=v_pedido.neto_usd, margen_pedido=v_pedido.margen,
+                neto_apertura_cop=v_apertura.neto_cop if v_apertura else None,
+                neto_apertura_usd=v_apertura.neto_usd if v_apertura else None,
+                margen_apertura=v_apertura.margen if v_apertura else None, piso_cop=piso, piso_usd=piso / trm,
+                flete_maximo_usd=flete_maximo(precio_co, compra, l.envio_us_usd, categoria, trm, p, com))
 
 def _alertar(con, modelo, notificador, p: dict) -> int:
     from .models import Listing as L, Normalizado, Oferta, ValoracionUS

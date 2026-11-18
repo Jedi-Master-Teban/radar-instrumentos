@@ -4,6 +4,7 @@ from pytest import approx
 
 from radar import db
 from radar.notify import SinAvisos
+from radar.costing import cuenta
 from radar.pipeline import correr
 from tests.conftest import HOY, listing
 from tests.fakes import BLOQUEO, Contador, ModeloFalso, co, us
@@ -35,7 +36,7 @@ def test_oportunidad_con_margen_se_alerta(con):
     op = av.alertas[0]
     assert op["tipo"] == "reventa" and op["margen_en_retiro"] >= 0.25
     assert op["oferta"]["retiro_usd"] == 500 and op["oferta"]["apertura_usd"] == approx(425.0)
-    assert op["precio_co_cop"] == approx(3_960_000) and op["mensaje"]
+    assert op["precio_co_cop"] == approx(4_950_000) and op["mensaje"]
 
 
 def test_sin_margen_no_se_alerta(con):
@@ -59,9 +60,9 @@ def test_sin_referencia_co_y_sin_descuento_no_se_alerta(con):
 
 
 def test_reventa_estimada_desde_precio_nuevo_de_tienda(con):
-    r, av = ejecutar(con, {"ebay": lector(listing(500))}, fuentes_co={"ortizo": co(n=0, nuevo=6_000_000)})
+    r, av = ejecutar(con, {"ebay": lector(listing(500))}, fuentes_co={"ortizo": co(n=0, nuevo=7_500_000)})
     op = av.alertas[0]
-    assert op["tipo"] == "reventa" and op["precio_co_cop"] == approx(4_200_000)
+    assert op["tipo"] == "reventa" and op["precio_co_cop"] == approx(5_250_000)
     assert any("estimado desde el nuevo" in b for b in op["banderas"])
 
 
@@ -165,7 +166,7 @@ def test_estimado_no_alerta_como_reventa_pero_trae_venta_sugerida(con):
 
 def test_margen_que_exige_rebaja_irreal_no_es_oportunidad(con):
     # la referencia de Colombia solo deja margen pagando ~30 % menos de lo pedido
-    r, av = ejecutar(con, {"ebay": lector(listing(800))}, fuentes_co={"meli": co(usado=4_400_000)},
+    r, av = ejecutar(con, {"ebay": lector(listing(800))}, fuentes_co={"meli": co(usado=6_000_000)},
                      fuentes_us={"reverb": us(usado=1000, nuevo=1300)})
     d = json.loads(con.execute("select datos from oportunidades").fetchone()[0])
     assert av.alertas == [] and d["hay_margen"] is False and d["rebaja_necesaria"] > 0.15
@@ -175,5 +176,9 @@ def test_margen_que_exige_rebaja_irreal_no_es_oportunidad(con):
 def test_venta_sugerida_en_reventa(con):
     r, av = ejecutar(con, {"ebay": lector(listing(500))})
     v = av.alertas[0]["venta"]
-    assert v["objetivo_cop"] == approx(3_960_000) and v["lista_cop"] == approx(3_960_000 / 0.93)
-    assert v["piso_cop"] == approx((2_463_843.33 + 120 * 3270) * 1.25, rel=1e-6) and v["piso_cop"] < v["objetivo_cop"]
+    assert v["objetivo_cop"] == approx(4_950_000) and v["lista_cop"] == approx(4_950_000 / 0.93)
+    costo = cuenta(500, 30, "guitarra", 3270, db.parametros(con)).total_cop
+    assert v["piso_cop"] == approx(costo * 1.25 / 0.95, rel=1e-6) and v["piso_cop"] < v["objetivo_cop"]
+    e = av.alertas[0]["escenarios"]
+    assert set(e) == {"0", "5", "10"} and e["10"]["techo_usd"] < e["5"]["techo_usd"] < e["0"]["techo_usd"]
+    assert e["5"]["neto_cop"] == approx(4_950_000 * 0.95 - costo) and e["5"]["neto_usd"] == approx(e["5"]["neto_cop"] / 3270)

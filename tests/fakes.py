@@ -40,7 +40,7 @@ def us(usado=900, nuevo=1200, n=4):
                     + [PrecioTienda("gc", "Fender Player Strat", nuevo, "nuevo")])
 
 
-def co(usado=4_400_000, n=3, nuevo=None):
+def co(usado=5_500_000, n=3, nuevo=None):
     items = [PrecioTienda("meli", "Fender Player Strat", usado, "usado") for _ in range(n)]
     if nuevo:
         items.append(PrecioTienda("Ortizo", "Fender Player Strat", nuevo, "nuevo"))

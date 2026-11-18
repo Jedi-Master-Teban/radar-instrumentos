@@ -171,7 +171,7 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo, carpeta_ca
         if o is None:
             raise HTTPException(404, "Oportunidad no encontrada")
         dg = o["desglose"]
-        cuentas = vistas.cuentas(dg, o["flete_real_cop"]) if dg else None
+        cuentas = vistas.cuentas(dg, o["flete_real_usd"]) if dg else None
         return html(c, "detalle.html", "", o=o, dg=dg, c=cuentas)
 
     @app.post("/oportunidad/{oid}/estado")
@@ -185,12 +185,12 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo, carpeta_ca
         return RedirectResponse(f"/oportunidad/{oid}", status_code=303)
 
     @app.post("/oportunidad/{oid}/flete")
-    def fijar_flete(oid: int, flete_real_cop: float = Form(...)):
-        if flete_real_cop < 0:
+    def fijar_flete(oid: int, flete_real_usd: float = Form(...)):
+        if flete_real_usd < 0:
             raise HTTPException(422, "El flete no puede ser negativo")
         c = con()
         _op(c, oid)
-        c.execute("update oportunidades set flete_real_cop=? where id=?", (flete_real_cop, oid))
+        c.execute("update oportunidades set flete_real_usd=? where id=?", (flete_real_usd, oid))
         c.commit()
         return RedirectResponse(f"/oportunidad/{oid}", status_code=303)
 

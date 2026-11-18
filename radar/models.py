@@ -59,11 +59,32 @@ class ReferenciaCO:
 
 
 @dataclass
+class Linea:
+    concepto: str
+    usd: float
+    cop: float
+
+
+@dataclass
 class Costo:
-    base_cop: float
-    arancel_cop: float
-    iva_cop: float
+    lineas: list[Linea]
+    total_usd: float
     total_cop: float
+    trm: float
+    flete_usd: float
+    seguro_usd: float
+
+
+@dataclass
+class Venta:
+    precio_cop: float
+    precio_usd: float
+    comision: float
+    comision_cop: float
+    comision_usd: float
+    neto_cop: float
+    neto_usd: float
+    margen: float
 
 
 @dataclass

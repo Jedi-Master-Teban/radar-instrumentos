@@ -1,14 +1,39 @@
 {
   "_nota": "Parámetros del sitio publicado. Fracciones en decimal: 0.25 es 25 %. Lo que no aparezca aquí usa el valor por defecto del código.",
   "margen_objetivo": 0.25,
-  "comision_canal": 0.0,
+  "comision_canal": 0.05,
   "regateo_co": 0.07,
   "rebaja_maxima_esperada": 0.15,
-  "ganga_descuento_min": 0.30,
-  "flete_supuesto_usd": {"guitarra": 120, "bajo": 120, "pedal": 25, "cuerdas": 15},
-  "arancel": 0.10,
+  "ganga_descuento_min": 0.3,
+  "flete_supuesto_usd": {
+    "guitarra": 200,
+    "bajo": 200,
+    "pedal": 25,
+    "cuerdas": 15
+  },
+  "arancel": 0.1,
   "iva": 0.19,
   "sales_tax_us": 0.07,
   "trm_manual": 3316.7,
-  "palabras_prioritarias": ["neck-thru", "neck thru", "neck-through", "neck through"]
+  "palabras_prioritarias": [
+    "neck-thru",
+    "neck thru",
+    "neck-through",
+    "neck through"
+  ],
+  "comisiones_escenario": [
+    0.0,
+    0.05,
+    0.1
+  ],
+  "seguro_pct": 0.035,
+  "seguro_min_usd": 10,
+  "inspeccion_usd": 10,
+  "ajuste_luthier_cop": {
+    "guitarra": 150000,
+    "bajo": 150000,
+    "pedal": 0,
+    "cuerdas": 0
+  },
+  "margen_cambiario": 0.015
 }

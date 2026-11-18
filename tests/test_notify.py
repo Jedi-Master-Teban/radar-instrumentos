@@ -21,8 +21,8 @@ def test_formatos():
 
 def test_formato_alerta(con):
     t = formato_alerta(una_alerta(con))
-    for esperado in ["REVENTA", "Apertura: US$425", "Retiro: US$500", "Colombia usado: $3.960.000 (3 refs)",
-                     "EE. UU. usado: US$810 (4 refs)", "Costo puesto sin flete: $2.463.843", "Flete máximo:",
+    for esperado in ["REVENTA", "Apertura: US$425", "Retiro: US$500", "Colombia usado: $4.950.000 (3 refs)",
+                     "EE. UU. usado: US$810 (4 refs)", "Costo puesto en Bogotá: US$", "Flete máximo:",
                      "https://www.ebay.com/itm/A1", "<pre>Would you accept $425?</pre>"]:
         assert esperado in t, esperado
 

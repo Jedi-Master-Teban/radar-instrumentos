@@ -1,30 +1,66 @@
-{% extends "base.html" %}{% import "_macros.html" as m %}
+{% extends "base.html" %}{% import "_macros.html" as m with context %}
 {% block titulo %}Hoy · Radar de instrumentos{% endblock %}
 {% block cuerpo %}
-<h1 class="oculto">Hoy</h1>
-<section class="cifras" aria-label="Resumen">
-<a class="cifra si" href="{{ e('explorar') }}#reventa"><b>{{ resumen.reventa }}</b><span>Reventa con margen</span></a>
-<a class="cifra si" href="{{ e('explorar') }}#ganga"><b>{{ resumen.ganga }}</b><span>Gangas</span></a>
-<a class="cifra" href="{{ e('explorar') }}#posible"><b>{{ resumen.posible }}</b><span>Posible reventa</span></a>
-<a class="cifra" href="{{ e('explorar') }}#oportunidad"><b>{{ resumen.bajo }}</b><span>10 % o más bajo el mercado</span></a>
-<a class="cifra pri" href="{{ e('explorar') }}#pri"><b>{{ resumen.prioritarias }}</b><span>Neck-thru</span></a>
-<a class="cifra" href="{{ e('explorar') }}"><b>{{ resumen.evaluadas }}</b><span>Publicaciones evaluadas</span></a>
+<section class="pregunta">
+<div>
+<h1>¿Qué ofertar hoy?</h1>
+<p>{% for k in comisiones %}<span class="esc" data-c="{{ k }}">{{ resumen.margen_por_com.get(k, 0) }} de {{ destacadas|length }} llegan al {{ p.margen_objetivo|pct }} neto con comisión del {{ k }} % si negocias hasta el techo.</span>{% endfor %} La lista muestra el neto al precio pedido. {{ resumen.evaluadas }} publicaciones evaluadas{% if resumen.prioritarias %}, {{ resumen.prioritarias }} neck-thru{% endif %}.</p>
+</div>
+<div class="selector" role="group" aria-label="Comisión del vendedor en Colombia"><span>Comisión del vendedor</span>
+<div class="segmentos">{% for k in comisiones %}<button type="button" class="pulsar" data-elegir-com="{{ k }}" aria-pressed="{{ 'true' if k == com_def else 'false' }}">{{ k }} %</button>{% endfor %}</div></div>
 </section>
 
-{% if modo != 'local' %}<p class="suave pequeno" style="margin:0">Se actualiza solo cada día a las 6:54 a. m. · <a href="{{ e('estado') }}#actualizar">Actualizar ahora</a></p>{% endif %}
-<section class="seccion">
-<div class="seccion-cab"><h2>Para mirar hoy</h2><span class="suave pequeno">Primero las de margen, luego gangas, posibles reventas y neck-thru</span></div>
-{% if destacadas %}<div class="tarjetas">{% for o in destacadas %}{{ m.tarjeta(o, e) }}{% endfor %}</div>
-{% elif total == 0 %}<div class="vacio">Todavía no hay publicaciones evaluadas. {% if modo == 'local' %}Agrega una captura en <code>datos/capturas/</code> o lanza una corrida desde <a href="{{ e('estado') }}">Estado</a>.{% else %}Aparecerán cuando entre la primera captura.{% endif %}</div>
-{% else %}<div class="vacio">Nada destacado hoy: ninguna publicación tiene margen, está bajo el mercado o trae una palabra prioritaria. <a href="{{ e('explorar') }}">Ver las {{ total }} en Explorar</a>.</div>{% endif %}
+{% if destacadas %}
+<div class="mesa">
+<section class="lista" aria-label="Para mirar hoy, ordenadas por neto al precio pedido">
+<div class="cols"><span>Para mirar hoy</span><span>Neto al precio pedido</span></div>
+<div style="display:flex;flex-direction:column;gap:2px">{% for o in destacadas %}{{ m.item(o, e, loop.first) }}{% endfor %}</div>
 </section>
+<div class="velo" id="velo"></div>
+<div class="panel" id="panel">
+<div class="cerrar"><button type="button" class="boton" id="cerrar" aria-label="Cerrar el estuche"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg></button></div>
+{% for o in destacadas %}<div data-panel="{{ o.id }}"{% if not loop.first %} class="oculto"{% endif %}>{{ m.estuche(o, e) }}</div>{% endfor %}
+</div>
+</div>
+{% elif total == 0 %}<div class="vacio">Todavía no hay publicaciones evaluadas. {% if modo == 'local' %}Agrega una captura en <code>datos/capturas/</code> o lanza una corrida desde <a href="{{ e('estado') }}">Estado</a>.{% else %}Aparecerán cuando entre la primera captura.{% endif %}</div>
+{% else %}<div class="vacio">Nada para mirar hoy: ninguna publicación tiene margen, está bajo el mercado o trae una palabra prioritaria. <a href="{{ e('explorar') }}" data-con-com>Ver las {{ total }} en Explorar</a>.</div>{% endif %}
+
+{% if modo != 'local' %}<p class="suave pequeno" style="margin:0">Se actualiza sola cada día a las 6:54 a. m. · <a href="{{ e('estado') }}#actualizar" data-con-com>Actualizar ahora</a></p>{% endif %}
 
 {% if resto %}
 <section class="seccion">
-<div class="seccion-cab"><h2>El resto del mercado</h2>
-<div class="chips">{% for c, nombre, n in categorias %}<a class="chip" href="{{ e('explorar') }}#cat-{{ c }}" style="text-decoration:none">{{ nombre }} · {{ n }}</a>{% endfor %}</div></div>
+<div class="seccion-cab"><h2>El resto del mercado</h2><a href="{{ e('explorar') }}" data-con-com>Ver las {{ total }} en Explorar</a></div>
 <div class="caja tabla"><table>{{ m.cabecera_tabla() }}{% for o in resto %}{{ m.fila(o, e) }}{% endfor %}</table></div>
-<a href="{{ e('explorar') }}">Ver las {{ total }} en Explorar</a>
 </section>
 {% endif %}
+{% endblock %}
+{% block js %}
+<script>
+(function(){
+  var panel = document.getElementById('panel'); if (!panel) return;
+  var velo = document.getElementById('velo'), movil = matchMedia('(max-width: 900px)');
+  function elegir(id, abrir){
+    document.querySelectorAll('[data-op]').forEach(function(a){ a.setAttribute('aria-current', a.getAttribute('data-op') === id ? 'true' : 'false'); });
+    document.querySelectorAll('[data-panel]').forEach(function(d){ d.classList.toggle('oculto', d.getAttribute('data-panel') !== id); });
+    if (abrir && movil.matches) { panel.classList.add('abierto'); velo.classList.add('abierto'); panel.scrollTop = 0; document.getElementById('cerrar').focus(); }
+  }
+  function cerrar(){ panel.classList.remove('abierto'); velo.classList.remove('abierto'); }
+  document.querySelectorAll('[data-op]').forEach(function(a){
+    a.addEventListener('click', function(ev){
+      if (ev.metaKey || ev.ctrlKey || ev.shiftKey) return;
+      ev.preventDefault(); elegir(a.getAttribute('data-op'), true);
+    });
+  });
+  document.getElementById('cerrar').addEventListener('click', cerrar); velo.addEventListener('click', cerrar);
+  document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') cerrar(); });
+  /* Al cambiar la comisión, queda elegida la primera de la lista ya reordenada */
+  function primera(){
+    var visibles = Array.prototype.slice.call(document.querySelectorAll('[data-op]'));
+    visibles.sort(function(a, b){ return parseFloat(getComputedStyle(a).order) - parseFloat(getComputedStyle(b).order); });
+    if (visibles[0]) elegir(visibles[0].getAttribute('data-op'), false);
+  }
+  document.addEventListener('comision', primera); primera();
+})();
+</script>
+{% include "_copiar.html" %}
 {% endblock %}

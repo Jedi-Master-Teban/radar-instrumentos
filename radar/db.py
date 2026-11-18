@@ -13,13 +13,18 @@ PARAMETROS_DEFECTO: dict = {
     "sales_tax_us": 0.07,
     "margen_cambiario": 0.015,
     "descuento_negociacion_co": 0.10,
-    "comision_canal": 0.0,
+    "comision_canal": 0.05,  # comisión del vendedor en Colombia con la que se deciden veredicto, techo y alertas
+    "comisiones_escenario": [0.0, 0.05, 0.10],  # escenarios que se muestran en el sitio
+    "seguro_pct": 0.035,  # seguro del envío internacional sobre el valor declarado (tarifa de MyUS)
+    "seguro_min_usd": 10,
+    "inspeccion_usd": 10,  # fotos e inspección en el casillero
+    "ajuste_luthier_cop": {"guitarra": 150000, "bajo": 150000, "pedal": 0, "cuerdas": 0},
     "min_refs_co": 3,
     "cache_co_dias": 7,
     "cache_us_dias": 7,
     "margen_objetivo": 0.25,
     "max_alertas_dia": 5,
-    "flete_supuesto_usd": {"guitarra": 120, "bajo": 120, "pedal": 25, "cuerdas": 15},
+    "flete_supuesto_usd": {"guitarra": 200, "bajo": 200, "pedal": 25, "cuerdas": 15},
     "precio_nuevo_min_usd": 600,
     "precio_nuevo_max_usd": 3500,
     "ganga_descuento_min": 0.30,
@@ -99,7 +104,7 @@ create table if not exists referencias_us(
 create table if not exists oportunidades(
   id integer primary key, listing_id integer unique, tipo text, puntaje real,
   datos text, estado text default 'nueva', creada text, alertada integer default 0,
-  flete_real_cop real);
+  flete_real_cop real, flete_real_usd real);
 create table if not exists parametros(clave text primary key, valor text);
 create table if not exists watchlist(
   id integer primary key, categoria text, marca text, consulta text unique, activo integer default 1);
@@ -111,6 +116,10 @@ def conectar(ruta: str) -> sqlite3.Connection:
     con = sqlite3.connect(ruta, timeout=30)
     con.row_factory = sqlite3.Row
     con.executescript(ESQUEMA)
+    # Migración: el flete real se guarda en dólares desde que el costo se lleva en USD y COP
+    cols = {f[1] for f in con.execute("pragma table_info(oportunidades)")}
+    if "flete_real_usd" not in cols:
+        con.execute("alter table oportunidades add column flete_real_usd real")
     for clave, valor in PARAMETROS_DEFECTO.items():
         con.execute("insert or ignore into parametros(clave, valor) values(?, ?)", (clave, json.dumps(valor)))
     # Migración: la primera versión traía solo dos ciudades; se amplía si el usuario no las cambió.

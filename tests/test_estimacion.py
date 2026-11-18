@@ -2,6 +2,7 @@ import json
 
 from pytest import approx
 
+from radar.costing import cuenta
 from radar.models import Normalizado, PrecioTienda, ValoracionUS
 from radar.valuation import ModeloPorPalabras, actualizar_colombia, estimar_co, sobreprecio_marca
 from tests.conftest import HOY, P
@@ -20,13 +21,13 @@ def ref(con, marca, modelo, nuevo_cop, nuevo_usd):
 def test_paridad_de_importacion_cuando_no_hay_datos(con):
     precio, n, origen = estimar_co(con, N, ValoracionUS(1485, 1400, 1700, 7, 2599), 3270, P)
     assert origen == "estimado: paridad de importación del nuevo"
-    assert precio == approx((2599 * 1.07 * 3270 * 1.015 * 1.1 * 1.19 + 120 * 3270) * 0.70)
+    assert precio == approx(cuenta(2599, 0, "guitarra", 3270, P).total_cop * 0.70)
 
 
 def test_costo_de_traer_una_usada_si_no_hay_precio_nuevo(con):
     precio, _, origen = estimar_co(con, N, ValoracionUS(1485, 1400, 1700, 7, None), 3270, P)
     assert origen == "estimado: costo de traer una usada"
-    assert precio == approx(1485 * 1.07 * 3270 * 1.015 * 1.1 * 1.19 + 120 * 3270)
+    assert precio == approx(cuenta(1485, 0, "guitarra", 3270, P).total_cop)
 
 
 def test_sobreprecio_de_la_marca_y_general(con):

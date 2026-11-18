@@ -3,55 +3,92 @@
 {%- endmacro %}
 
 {% macro chips(o) -%}
-<div class="chips"><span class="chip {{ o.clase }}">{{ o.corto }}</span>{% if o.prioritario %}<span class="chip pri">Neck-thru</span>{% endif %}{% if o.confianza_co == 'baja' %}<span class="chip">Colombia estimado</span>{% endif %}{% if o.banderas %}<span class="chip pri">Revisar</span>{% endif %}{% if o.estado != 'nueva' %}<span class="chip">{{ o.estado }}</span>{% endif %}</div>
+<div class="chips"><span class="chip {{ o.clase }}">{{ o.corto }}</span>{% if o.prioritario %}<span class="chip posible">Neck-thru</span>{% endif %}{% if o.confianza_co == 'baja' %}<span class="chip estimada">Referencia de Colombia estimada</span>{% endif %}{% if o.banderas %}<span class="chip revisar">Revisar</span>{% endif %}{% if o.estado != 'nueva' %}<span class="chip">{{ o.estado|plataforma }}</span>{% endif %}</div>
 {%- endmacro %}
 
-{% macro meta(o) -%}
-{{ o.normalizado.marca }} · {{ o.listing.plataforma|capitalize }} · {{ o.normalizado.estado }}{% if o.dias_publicado is not none %} · {{ o.dias_publicado }} días publicada{% endif %}{% if o.listing.acepta_ofertas %} · acepta ofertas{% endif %}
+{% macro sub(o) -%}
+{{ o.listing.plataforma|plataforma }} · {{ o.normalizado.estado }}{% if o.normalizado.anio %} · {{ o.normalizado.anio }}{% endif %}{% if o.dias_publicado is not none %} · {{ o.dias_publicado }} días publicada{% endif %}{% if o.listing.acepta_ofertas %} · acepta ofertas{% endif %}
 {%- endmacro %}
 
-{% macro tarjeta(o, e) -%}
-<article class="tarjeta" data-id="{{ o.id }}">
-{{ foto(o) }}
-<div class="cuerpo">
+{# Una cifra en pesos con su equivalente en dólares debajo #}
+{% macro dinero(cop, usd, signo=False, clase="") -%}
+<span class="dinero {{ clase }}">{% if signo %}<span>{{ cop|scop }}</span><span class="usd">{{ usd|susd }}</span>{% else %}<span>{{ cop|cop }}</span><span class="usd">{{ usd|usd }}</span>{% endif %}</span>
+{%- endmacro %}
+
+{# Fila de la lista de Hoy: neto al precio pedido para cada comisión #}
+{% macro item(o, e, sel=False) -%}
+<a class="item ord" href="{{ e('detalle', o.id) }}" data-con-com data-op="{{ o.id }}" aria-current="{{ 'true' if sel else 'false' }}" style="{% for k, v in o.esc.items() %}--o{{ k }}:{{ (-v.neto_pedido_cop / 1000)|round|int }};{% endfor %}{% if not o.esc %}--o0:99999;--o5:99999;--o10:99999{% endif %}">
+<span class="nom"><b>{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</b><span>{{ o.listing.plataforma|plataforma }} · {{ o.normalizado.estado }} · pide {{ o.listing.precio_usd|usd }}</span>{% if o.confianza_co == 'baja' or o.prioritario %}<span class="chips" style="margin-top:3px">{% if o.confianza_co == 'baja' %}<span class="chip estimada">Referencia estimada</span>{% endif %}{% if o.prioritario %}<span class="chip posible">Neck-thru</span>{% endif %}</span>{% endif %}</span>
+{% if o.esc %}{% for k, v in o.esc.items() %}<span class="esc dinero" data-c="{{ k }}"><span class="monto {{ 'pos' if v.neto_pedido_cop >= 0 else 'neg' }}">{{ v.neto_pedido_cop|scop }}</span><span class="usd">{{ v.neto_pedido_usd|susd }} · {{ v.margen_pedido|spct }}</span></span>{% endfor %}
+{% else %}<span class="dinero"><span class="monto suave">—</span><span class="usd">sin cuenta</span></span>{% endif %}
+</a>
+{%- endmacro %}
+
+{# Estuche: oferta, cascada al precio pedido y venta, en USD y COP para cada comisión #}
+{% macro estuche(o, e, completo=False, titulo_h="h2") -%}
+<section class="estuche" aria-label="Estuche de {{ o.normalizado.marca }} {{ o.normalizado.modelo }}" data-estuche="{{ o.id }}">
+<div class="cabeza">
+{{ foto(o, perezosa=not completo) }}
+<div class="datos">
 {{ chips(o) }}
-<div><h3>{{ o.normalizado.modelo }}</h3><div class="suave pequeno">{{ meta(o) }}</div></div>
-<div class="pares">
-<div class="par"><span>Precio pedido</span><span>{{ o.listing.precio_usd|usd }}{% if o.descuento_us is not none %}<small>{% if o.descuento_us >= 0 %}{{ o.descuento_us|pct }} bajo el mercado{% else %}{{ (-o.descuento_us)|pct }} sobre el mercado{% endif %}</small>{% endif %}</span></div>
-<div class="par"><span>Oferta sugerida</span><span>{% if o.oferta %}{{ o.oferta.apertura_usd|usd }} → {{ o.oferta.techo_usd|usd }}<small>apertura → techo</small>{% else %}—<small>{{ 'faltan comparables' if not o.valoracion_us else 'muy lejos del tope' }}</small>{% endif %}</span></div>
-<div class="par"><span>Referencia Colombia</span><span>{% if o.precio_co_cop is defined %}{{ o.precio_co_cop|cop }}<small>{{ 'estimada' if o.confianza_co == 'baja' else o.origen_co }}</small>{% else %}—{% endif %}</span></div>
-<div class="par"><span>Venta sugerida</span><span>{% if o.venta %}{{ o.venta.lista_cop|cop }}<small>piso {{ o.venta.piso_cop|cop }}</small>{% else %}—<small>define tú el precio</small>{% endif %}</span></div>
+<div><{{ titulo_h }} style="font-size:26px">{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</{{ titulo_h }}>
+<p class="suave pequeno" style="margin:6px 0 0">{{ sub(o) }}</p></div>
+{% if o.esc %}{% for k, v in o.esc.items() %}<div class="tres esc" data-c="{{ k }}">
+<div class="cifra"><span class="k">Abre con</span><span class="v pos">{{ v.apertura|usd if v.apertura else '—' }}</span><span class="s">{{ ('≈ ' ~ (v.apertura * o.trm)|millones) if v.apertura else 'sin oferta' }}</span></div>
+<div class="cifra"><span class="k">Pide</span><span class="v">{{ o.listing.precio_usd|usd }}</span><span class="s">≈ {{ (o.listing.precio_usd * o.trm)|millones }}{% if o.listing.envio_us_usd %} · envío {{ o.listing.envio_us_usd|usd }}{% endif %}</span></div>
+<div class="cifra"><span class="k">Techo ({{ p.margen_objetivo|pct }} neto)</span><span class="v">{{ v.techo|usd if v.techo > 0 else '—' }}</span><span class="s">{{ ('≈ ' ~ (v.techo * o.trm)|millones) if v.techo > 0 else 'ni regalada' }}</span></div>
+</div>{% endfor %}{% endif %}
+<div class="botones">
+{% if o.mensajes %}{% for k, v in o.esc.items() %}<button type="button" class="boton prim pulsar esc" data-c="{{ k }}" data-copiar="{{ o.id }}"{% if not v.apertura %} disabled{% endif %}>{{ ('Copiar oferta de ' ~ (v.apertura|usd)) if v.apertura else 'Sin oferta con esta comisión' }}</button>{% endfor %}{% endif %}
+<a class="boton" href="{{ o.listing.url }}" target="_blank" rel="noopener">Abrir en {{ o.listing.plataforma|plataforma }}</a>
+{% if not completo %}<a class="boton" href="{{ e('detalle', o.id) }}" data-con-com>Ver cuentas y comparables</a>{% endif %}
 </div>
-<div class="pie-tarjeta"><span class="suave pequeno">{% if o.margen_en_retiro is defined %}Margen comprando al techo{% if o.rebaja_necesaria and o.rebaja_necesaria > 0.005 %} · pide −{{ o.rebaja_necesaria|pct }}{% endif %}{% elif o.prioritario %}Palabra prioritaria en el título{% else %}Sin margen calculado{% endif %}</span>
-<span class="margen {{ '' if o.hay_margen else 'neg' }}">{% if o.margen_en_retiro is defined %}{{ o.margen_en_retiro|pct }}{% else %}—{% endif %}</span></div>
-<div class="botones"><a class="boton prim" href="{{ o.listing.url }}" target="_blank" rel="noopener">Ver publicación</a><a class="boton" href="{{ e('detalle', o.id) }}">Detalle</a></div>
-</div></article>
+{% for k, txt in o.mensajes.items() %}<p class="oculto" id="msg-{{ o.id }}-{{ k }}">{{ txt }}</p>{% endfor %}{% if o.mensajes %}<span class="suave chico" aria-live="polite" data-copiado="{{ o.id }}"></span>{% endif %}
+</div></div>
+{% for b in o.banderas %}<p class="aviso">{{ b }}</p>{% endfor %}
+{% if o.esc %}{% for k, v in o.esc.items() %}<div class="esc" data-c="{{ k }}" style="display:flex;flex-direction:column;gap:14px">
+<div class="seccion-cab"><h3>A dónde va cada peso de la venta</h3><span class="suave pequeno">Comprando al precio pedido, {{ o.listing.precio_usd|usd }} · TRM {{ o.trm|trm }}</span></div>
+<div class="cascada" role="img" aria-label="Venta de {{ o.precio_co_cop|cop }}: {% for s in v.pasos %}{{ s.etiqueta }} {{ s.cop|cop }}{{ ', ' if not loop.last }}{% endfor %}">
+<span class="tit"></span><span class="tit"></span><span class="tit">USD</span><span class="tit">COP</span>
+{% for s in v.pasos %}{% set fuerte = s.tipo in ('ganancia', 'perdida') %}
+<span class="et{{ ' fuerte' if fuerte }}">{{ s.etiqueta }}</span>
+<span class="c{{ ' fuerte ' ~ ('pos' if s.tipo == 'ganancia' else 'neg') if fuerte }}">{{ (s.cop|scop) if fuerte else (s.cop|cop) }} <span class="ux">· {{ (s.usd|susd) if fuerte else (s.usd|usd) }}</span></span>
+<span class="u{{ ' fuerte ' ~ ('pos' if s.tipo == 'ganancia' else 'neg') if fuerte }}">{{ (s.usd|susd) if fuerte else (s.usd|usd) }}</span>
+<span class="barra"><i class="{{ s.tipo }}" style="left:{{ s.izq }}%;width:{{ s.ancho }}%"></i></span>
+{% endfor %}</div>
+<div class="tres">
+<div class="cifra"><span class="k">Publica en</span><span class="v" style="font-size:18px">{{ o.venta.lista_cop|cop }}</span><span class="s">{{ (o.venta.lista_cop / o.trm)|usd }}</span></div>
+<div class="cifra"><span class="k">Cierre esperado</span><span class="v" style="font-size:18px">{{ o.venta.objetivo_cop|cop }}</span><span class="s">{{ (o.venta.objetivo_cop / o.trm)|usd }} · {{ 'estimada' if o.confianza_co == 'baja' else o.origen_co }}</span></div>
+<div class="cifra"><span class="k">Piso ({{ p.margen_objetivo|pct }} neto)</span><span class="v" style="font-size:18px">{{ v.piso_cop|cop }}</span><span class="s">{{ v.piso_usd|usd }}</span></div>
+</div>
+<div class="neto"><span class="suave">Neto al precio pedido</span><span class="grande {{ 'pos' if v.neto_pedido_cop >= 0 else 'neg' }}">{{ v.neto_pedido_cop|scop }}</span><span style="font-size:18px;font-weight:600">{{ v.neto_pedido_usd|susd }}</span><span class="suave">{{ v.margen_pedido|spct }} sobre el costo</span></div>
+<p class="nota">{% if v.hay_oferta %}Si el vendedor acepta {{ v.apertura|usd }}: {{ v.neto_apertura_cop|scop }} · {{ v.neto_apertura_usd|susd }} ({{ v.margen_apertura|spct }}). {% if v.techo >= o.listing.precio_usd %}El techo ({{ v.techo|usd }}) está por encima de lo que piden: aun pagando el precio pedido queda más del {{ p.margen_objetivo|pct }}.{% else %}Pagando el techo de {{ v.techo|usd }}: {{ v.neto_techo_cop|scop }} · {{ v.neto_techo_usd|susd }} ({{ p.margen_objetivo|pct }}).{% endif %}{% else %}Con esta comisión no hay una oferta razonable que deje el {{ p.margen_objetivo|pct }}: el techo queda por debajo del 60 % del precio pedido.{% endif %}{% if o.confianza_co == 'baja' %} La referencia de Colombia es estimada: confírmala con tu vendedor antes de ofertar.{% endif %}</p>
+</div>{% endfor %}
+{% else %}<p class="aviso">{% if not o.valoracion_us %}Hay menos de 3 publicaciones del mismo modelo en EE. UU.: no hay mediana para valorarla ni oferta sugerida. Puesta en Bogotá al precio pedido costaría {{ o.costo.total_cop|cop }} · {{ o.costo.total_usd|usd }}.{% else %}Sin cuenta de compra y venta para esta publicación.{% endif %}</p>{% endif %}
+</section>
 {%- endmacro %}
 
+{# Fila de Explorar #}
 {% macro fila(o, e) -%}
 <tr data-cat="{{ o.categoria }}" data-clase="{{ o.clase }}" data-marca="{{ o.normalizado.marca }}" data-plat="{{ o.listing.plataforma }}" data-estado="{{ o.estado }}" data-texto="{{ (o.normalizado.marca ~ ' ' ~ o.normalizado.modelo ~ ' ' ~ o.listing.titulo)|lower }}"
- data-precio="{{ o.listing.precio_usd }}" data-desc="{{ o.descuento_us if o.descuento_us is not none else -9 }}" data-margen="{{ o.margen_en_retiro if o.margen_en_retiro is defined else -9 }}" data-orden="{{ o.orden }}" data-pri="{{ 1 if o.prioritario else 0 }}">
-<td><a class="tit" href="{{ e('detalle', o.id) }}">{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</a>{% if o.prioritario %} <span class="chip pri">Neck-thru</span>{% endif %}<small>{{ o.listing.titulo[:64] }} · <a href="{{ o.listing.url }}" target="_blank" rel="noopener">{{ o.listing.plataforma|capitalize }} ↗</a></small></td>
-<td><span class="chip {{ o.clase }}">{{ o.corto }}</span></td>
-<td class="n">{{ o.listing.precio_usd|usd }}</td>
-<td class="n">{% if o.valoracion_us %}{{ o.valoracion_us.mediana_usd|usd }}<small>{{ o.valoracion_us.n }} refs · nuevo {{ o.valoracion_us.nuevo_usd|usd }}</small>{% else %}<span class="suave">—</span><small>menos de 3 refs</small>{% endif %}</td>
-<td class="n {{ 'pos' if o.descuento_us is not none and o.descuento_us >= 0.10 else 'neg' }}">{% if o.descuento_us is none %}—{% elif o.descuento_us >= 0 %}−{{ o.descuento_us|pct }}{% else %}+{{ (-o.descuento_us)|pct }}{% endif %}</td>
-<td class="n">{% if o.precio_co_cop is defined %}{{ o.precio_co_cop|cop }}<small>{{ 'estimada' if o.confianza_co == 'baja' else o.origen_co }}</small>{% else %}<span class="suave">—</span>{% endif %}</td>
-<td class="n">{% if o.oferta %}{{ o.oferta.apertura_usd|usd }} → {{ o.oferta.techo_usd|usd }}{% else %}<span class="suave">—</span>{% endif %}</td>
-<td class="n">{% if o.venta %}{{ o.venta.lista_cop|cop }}<small>piso {{ o.venta.piso_cop|cop }}</small>{% else %}<span class="suave">—</span>{% endif %}</td>
-<td class="n">{% if o.margen_en_retiro is defined %}<span class="{{ 'pos' if o.hay_margen else 'neg' }}">{{ o.margen_en_retiro|pct }}</span>{% if o.rebaja_necesaria and o.rebaja_necesaria > 0.005 %}<small>pide −{{ o.rebaja_necesaria|pct }}</small>{% endif %}{% else %}<span class="suave">—</span>{% endif %}</td>
+ data-precio="{{ o.listing.precio_usd }}" data-desc="{{ o.descuento_us if o.descuento_us is not none else -9 }}" data-orden="{{ o.orden }}" data-pri="{{ 1 if o.prioritario else 0 }}"{% for k, v in o.esc.items() %} data-neto{{ k }}="{{ v.neto_pedido_cop|round|int }}"{% endfor %}>
+<td><a class="t" href="{{ e('detalle', o.id) }}" data-con-com>{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</a><small>{{ o.listing.titulo[:64] }} · <a href="{{ o.listing.url }}" target="_blank" rel="noopener">{{ o.listing.plataforma|plataforma }}</a></small></td>
+<td>{{ chips(o) }}</td>
+<td class="n">{{ o.listing.precio_usd|usd }}<small>≈ {{ (o.listing.precio_usd * o.trm)|millones }}</small></td>
+<td class="n">{% if o.valoracion_us %}{{ o.valoracion_us.mediana_usd|usd }}<small>{{ o.valoracion_us.n }} refs · {% if o.descuento_us >= 0 %}pide {{ o.descuento_us|pct }} menos{% else %}pide {{ (-o.descuento_us)|pct }} más{% endif %}</small>{% else %}<span class="suave">—</span><small>menos de 3 refs</small>{% endif %}</td>
+<td class="n">{% if o.precio_co_cop is defined %}{{ o.precio_co_cop|cop }}<small>{{ (o.precio_co_cop / o.trm)|usd }} · {{ 'estimada' if o.confianza_co == 'baja' else 'tiendas' }}</small>{% else %}<span class="suave">—</span>{% endif %}</td>
+<td class="n">{% if o.esc %}{% for k, v in o.esc.items() %}<span class="esc" data-c="{{ k }}">{% if v.apertura %}{{ v.apertura|usd }} → {{ v.techo|usd }}{% else %}<span class="suave">—</span>{% endif %}</span>{% endfor %}{% else %}<span class="suave">—</span>{% endif %}</td>
+<td class="n">{% if o.esc %}{% for k, v in o.esc.items() %}<span class="esc" data-c="{{ k }}"><span class="{{ 'pos' if v.neto_pedido_cop >= 0 else 'neg' }}" style="font-weight:600">{{ v.neto_pedido_cop|scop }}</span><small>{{ v.neto_pedido_usd|susd }} · {{ v.margen_pedido|spct }}</small></span>{% endfor %}{% else %}<span class="suave">—</span>{% endif %}</td>
 </tr>
 {%- endmacro %}
 
 {% macro cabecera_tabla(ordenable=False) -%}
 <tr>
 <th>Publicación</th><th>Veredicto</th>
-<th class="n">{% if ordenable %}<button type="button" data-orden="precio">Pedido</button>{% else %}Pedido{% endif %}</th>
-<th class="n">EE. UU. usado<small>mediana ajustada</small></th>
-<th class="n">{% if ordenable %}<button type="button" data-orden="desc">Frente al mercado</button>{% else %}Frente al mercado{% endif %}</th>
-<th class="n">Colombia<small>referencia</small></th>
-<th class="n">Oferta<small>apertura → techo</small></th>
-<th class="n">Venta<small>lista · piso</small></th>
-<th class="n">{% if ordenable %}<button type="button" data-orden="margen">Margen</button>{% else %}Margen{% endif %}<small>al techo</small></th>
+<th class="n">{% if ordenable %}<button type="button" data-orden="precio">Pide</button>{% else %}Pide{% endif %}<small>USD · ≈ COP</small></th>
+<th class="n">{% if ordenable %}<button type="button" data-orden="desc">EE. UU. usado</button>{% else %}EE. UU. usado{% endif %}<small>mediana ajustada</small></th>
+<th class="n">Colombia<small>cierre esperado</small></th>
+<th class="n">Oferta<small>abre → techo</small></th>
+<th class="n">{% if ordenable %}<button type="button" data-orden="neto">Neto al precio pedido</button>{% else %}Neto al precio pedido{% endif %}<small>COP · USD · margen</small></th>
 </tr>
 {%- endmacro %}

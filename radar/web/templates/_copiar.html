@@ -1,0 +1,12 @@
+<script>
+(function(){
+  document.addEventListener('click', function(ev){
+    var b = ev.target.closest('[data-copiar]'); if (!b) return;
+    var id = b.getAttribute('data-copiar'), msg = document.getElementById('msg-' + id + '-' + window.radarComision()), aviso = document.querySelector('[data-copiado="' + id + '"]');
+    var decir = function(t){ if (aviso) aviso.textContent = t; };
+    if (!msg) { decir('Sin oferta sugerida con esta comisión'); return; }
+    try { navigator.clipboard.writeText(msg.textContent).then(function(){ decir('Mensaje de oferta copiado'); }, function(){ decir('No se pudo copiar: ábrelo en Ver cuentas y cópialo a mano'); }); }
+    catch (err) { decir('No se pudo copiar: ábrelo en Ver cuentas y cópialo a mano'); }
+  });
+})();
+</script>

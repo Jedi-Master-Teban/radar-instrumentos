@@ -28,27 +28,32 @@ def cliente(tmp_path, monkeypatch):
     return TestClient(crear_app(aj, carpeta_capturas=tmp_path / 'capturas')), aj
 
 
-def test_hoy_muestra_reventa_y_ganga_en_tarjetas(cliente):
+def test_hoy_muestra_lista_y_estuche_en_dos_monedas(cliente):
     c, _ = cliente
     r = c.get("/")
     assert r.status_code == 200 and "Player Stratocaster" in r.text and "Boden Plini" in r.text
-    assert 'chip reventa">Reventa' in r.text and 'chip ganga">Ganga' in r.text and "Colombia estimado" in r.text
-    assert r.text.count('class="tarjeta"') == 2 and 'href="/oportunidad/1"' in r.text
+    assert 'chip reventa">Reventa' in r.text and 'chip ganga">Ganga' in r.text and "Referencia de Colombia estimada" in r.text
+    assert r.text.count('data-op="') == 2 and r.text.count('data-panel="') == 2 and 'href="/oportunidad/1"' in r.text
+    # una cifra por comisión, en pesos y dólares
+    for k in ("0", "5", "10"):
+        assert f'class="esc dinero" data-c="{k}"' in r.text and f'data-elegir-com="{k}"' in r.text
+    assert "A dónde va cada peso de la venta" in r.text and ">USD<" in r.text and ">COP<" in r.text and "US$" in r.text
 
 
 def test_explorar_trae_todo_para_filtrar(cliente):
     c, _ = cliente
     t = c.get("/explorar").text
     assert 'data-clase="ganga"' in t and 'data-clase="reventa"' in t and "Solo oportunidades" in t
-    assert 'data-marca="Strandberg"' in t and 'class="activa">Explorar' in t.replace('href="/explorar" ', "")
+    assert 'data-marca="Strandberg"' in t and 'aria-current="page">Explorar' in t
+    assert 'data-neto5="' in t and 'data-neto10="' in t and "Neto al precio pedido" in t
 
 
 def test_detalle_y_cambio_de_estado(cliente):
     c, _ = cliente
     t = c.get("/oportunidad/1").text
-    assert "Mensaje de oferta" in t and "Venta en Colombia" in t and "Publica en" in t
+    assert "Mensaje de oferta" in t and "Con tus números" in t and "Publica en" in t and "cuentasRadar" in t
     assert c.post("/oportunidad/1/estado", data={"estado": "ofertada"}, follow_redirects=False).status_code == 303
-    assert '<span class="chip">ofertada</span>' in c.get("/oportunidad/1").text
+    assert '<span class="chip">Ofertada</span>' in c.get("/oportunidad/1").text
     assert c.post("/oportunidad/1/estado", data={"estado": "robada"}).status_code == 422
     assert c.get("/oportunidad/999").status_code == 404
 
@@ -56,18 +61,18 @@ def test_detalle_y_cambio_de_estado(cliente):
 def test_detalle_de_ganga_explica_que_no_esta_en_colombia(cliente):
     c, _ = cliente
     t = c.get("/oportunidad/2").text
-    assert "no aparece en tiendas colombianas" in t and "inusualmente bajo" in t
+    assert "No aparece en las tiendas consultadas" in t and "es una estimación" in t and "inusualmente bajo" in t
 
 
 def test_flete_real_mueve_el_techo_y_se_guarda(cliente):
     c, _ = cliente
     antes = c.get("/oportunidad/1").text
-    c.post("/oportunidad/1/flete", data={"flete_real_cop": "900000"})
+    assert 'id="i-flete" min="0" step="5" inputmode="decimal" value="200"' in antes
+    c.post("/oportunidad/1/flete", data={"flete_real_usd": "260"})
     t = c.get("/oportunidad/1").text
-    assert 'id="i-flete" min="0" step="10000" value="900000"' in t
-    techo = lambda html: html.split('id="v-techo">')[1].split("<")[0]
-    assert techo(antes) != techo(t) and 'id="v-margen">25 %' in t  # el techo baja para conservar el margen
-    assert c.post("/oportunidad/1/flete", data={"flete_real_cop": "-5"}).status_code == 422
+    assert 'id="i-flete" min="0" step="5" inputmode="decimal" value="260"' in t
+    assert '"flete": 200' in t  # el radar conserva su supuesto; el navegador recalcula con el flete guardado
+    assert c.post("/oportunidad/1/flete", data={"flete_real_usd": "-5"}).status_code == 422
 
 
 def test_parametros(cliente):
@@ -162,6 +167,7 @@ def test_tablero_importa_capturas_del_repo_al_abrir(tmp_path, monkeypatch):
     (carpeta / "a.json").write_text(js.dumps({"fuente": "reverb", "publicaciones": pubs}))
     c = TestClient(crear_app(aj, carpeta_capturas=carpeta))
     t = c.get("/").text
-    assert 'href="https://reverb.com/item/0"' in t and 'chip ganga">Ganga' in t and "Guitarras · 5" in t
+    assert 'href="https://reverb.com/item/0"' in t and 'chip ganga">Ganga' in t
     x = c.get("/explorar").text
+    assert "Guitarras (5)" in x
     assert "A precio de mercado" in x and "Neck-thru" in x and "capturas importadas" in c.get("/corrida").text

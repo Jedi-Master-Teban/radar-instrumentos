@@ -1,7 +1,11 @@
-{% extends "base.html" %}{% import "_macros.html" as m %}
+{% extends "base.html" %}{% import "_macros.html" as m with context %}
 {% block titulo %}Explorar · Radar de instrumentos{% endblock %}
 {% block cuerpo %}
-<div class="seccion-cab"><h1>Explorar</h1><span class="suave pequeno" id="cuenta">{{ ops|length }} publicaciones</span></div>
+<section class="pregunta">
+<div><h1>Explorar</h1><p id="cuenta">{{ ops|length }} publicaciones</p></div>
+<div class="selector" role="group" aria-label="Comisión del vendedor en Colombia"><span>Comisión del vendedor</span>
+<div class="segmentos">{% for k in comisiones %}<button type="button" class="pulsar" data-elegir-com="{{ k }}" aria-pressed="{{ 'true' if k == com_def else 'false' }}">{{ k }} %</button>{% endfor %}</div></div>
+</section>
 <form class="filtros" id="filtros" onsubmit="return false">
 <label>Buscar<input type="search" id="f-texto" placeholder="Modelo, color, año…"></label>
 <label>Categoría<select id="f-cat"><option value="">Todas</option>{% for c, nombre, n in categorias %}{% if n %}<option value="{{ c }}">{{ nombre }} ({{ n }})</option>{% endif %}{% endfor %}</select></label>
@@ -9,8 +13,8 @@
 <option value="reventa">Reventa</option><option value="ganga">Ganga</option><option value="posible">Posible reventa</option><option value="bajo">Bajo el mercado</option>
 <option value="mercado">A precio de mercado</option><option value="sinmargen">Sin margen</option><option value="encima">Sobre el mercado</option><option value="sincomp">Sin comparables</option><option value="pri">Neck-thru</option></select></label>
 <label>Marca<select id="f-marca"><option value="">Todas</option>{% for x in marcas %}<option>{{ x }}</option>{% endfor %}</select></label>
-<label>Plataforma<select id="f-plat"><option value="">Todas</option>{% for x in plataformas %}<option value="{{ x }}">{{ x|capitalize }}</option>{% endfor %}</select></label>
-<label>Precio máximo (USD)<input type="number" id="f-max" min="0" step="50" placeholder="Sin límite"></label>
+<label>Plataforma<select id="f-plat"><option value="">Todas</option>{% for x in plataformas %}<option value="{{ x }}">{{ x|plataforma }}</option>{% endfor %}</select></label>
+<label>Precio máximo (USD)<input type="number" id="f-max" min="0" step="50" inputmode="numeric" placeholder="Sin límite"></label>
 <label>Estado<select id="f-estado"><option value="activas">Sin descartar</option><option value="">Todas</option>{% for x in estados %}<option>{{ x }}</option>{% endfor %}</select></label>
 </form>
 {% if ops %}<div class="caja tabla"><table id="tabla"><thead>{{ m.cabecera_tabla(True) }}</thead><tbody>{% for o in ops %}{{ m.fila(o, e) }}{% endfor %}</tbody></table></div>
@@ -26,7 +30,7 @@
   var OPORT = {reventa:1, ganga:1, posible:1, bajo:1};
   var estadoLocal = {};
   try { estadoLocal = JSON.parse(localStorage.getItem('radar-estados') || '{}'); } catch (err) {}
-  function estadoDe(tr){ var id = tr.querySelector('a.tit').getAttribute('href'); return estadoLocal[id] || tr.dataset.estado; }
+  function estadoDe(tr){ var id = (tr.querySelector('a.t').dataset.base || tr.querySelector('a.t').getAttribute('href')).split('?')[0]; return estadoLocal['/' + id] || estadoLocal[id] || tr.dataset.estado; }
   function aplicar(){
     var t = $('f-texto').value.trim().toLowerCase(), c = $('f-cat').value, k = $('f-clase').value, ma = $('f-marca').value,
         pl = $('f-plat').value, mx = parseFloat($('f-max').value), es = $('f-estado').value, n = 0;
@@ -52,7 +56,9 @@
     b.addEventListener('click', function(){
       var campo = b.dataset.orden; dir[campo] = !dir[campo];
       var s = dir[campo] ? -1 : 1;
-      filas.sort(function(a, z){ return s * (parseFloat(a.dataset[campo]) - parseFloat(z.dataset[campo])); });
+      var c = campo === 'neto' ? 'neto' + window.radarComision() : campo;
+      var val = function(tr){ var x = parseFloat(tr.dataset[c]); return isNaN(x) ? -1e15 : x; };
+      filas.sort(function(a, z){ return s * (val(a) - val(z)); });
       filas.forEach(function(tr){ cuerpo.appendChild(tr); });
     });
   });

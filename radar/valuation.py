@@ -7,7 +7,7 @@ from datetime import date
 from statistics import median, quantiles
 
 from . import db
-from .costing import costo_puesto
+from .costing import cuenta
 from .collectors.base import LectorBloqueado
 from .models import Normalizado, PrecioTienda, ReferenciaCO, ValoracionUS
 
@@ -169,14 +169,13 @@ def sobreprecio_marca(con, marca: str, trm: float) -> tuple[float, int, str] | N
 def estimar_co(con, n: Normalizado, val: ValoracionUS, trm: float, p: dict) -> tuple[float, int, str]:
     """Precio de venta estimado en Colombia para un modelo que no aparece allí. Siempre devuelve algo."""
     f = p["factor_usado_sobre_nuevo_co"]
-    flete = p["flete_supuesto_usd"].get(n.categoria, 0) * trm
     if val.nuevo_usd:
         sp = sobreprecio_marca(con, n.marca, trm)
         if sp:
             return val.nuevo_usd * trm * sp[0] * f, min(sp[1], 3), f"estimado: sobreprecio de {sp[2]} ×{sp[0]:.2f}"
-        return ((costo_puesto(val.nuevo_usd, 0, trm, p).total_cop + flete) * f, 1,
+        return (cuenta(val.nuevo_usd, 0, n.categoria, trm, p).total_cop * f, 1,
                 "estimado: paridad de importación del nuevo")
-    return (costo_puesto(val.mediana_usd, 0, trm, p).total_cop + flete, 1,
+    return (cuenta(val.mediana_usd, 0, n.categoria, trm, p).total_cop, 1,
             "estimado: costo de traer una usada")
 
 

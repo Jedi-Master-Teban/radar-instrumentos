@@ -58,17 +58,48 @@ def test_detalle_estatico_sin_formularios_locales(tmp_path):
     assert con_cuenta and "edit/main/datos/referencias_co.json" in con_cuenta[0] and 'data-estado="descartada"' in con_cuenta[0]
 
 
-def test_cuenta_del_navegador_coincide_con_la_del_radar(con):
+def _una_op(con):
     con.execute("update watchlist set activo=0")
     con.execute("update watchlist set activo=1 where consulta='Fender electric guitar'")
-    av = SinAvisos()
-    correr(con, {"ebay": lambda c: [listing(500)]}, {"r": us()}, {"m": co()}, ModeloFalso(), av, 3270, HOY)
-    o = vistas.cargar_ops(con)[0]
+    correr(con, {"ebay": lambda c: [listing(500)]}, {"r": us()}, {"m": co()}, ModeloFalso(), SinAvisos(), 3270, HOY)
+    return vistas.cargar_ops(con)[0]
+
+
+def test_cuenta_del_navegador_coincide_con_la_del_radar(con):
+    o = _una_op(con)
+    for k, e in o["escenarios"].items():
+        c = vistas.cuentas(o["desglose"], comision=e["comision"])
+        assert c["techo"] == approx(e["techo_usd"], abs=0.01) and c["compra"] == approx(e["compra_usd"], abs=0.01)
+        assert c["apertura"] == approx(e["oferta"]["apertura_usd"], abs=0.01)
+        assert c["neto_cop"] == approx(e["neto_cop"], abs=1) and c["neto_usd"] == approx(e["neto_usd"], abs=0.01)
+        assert c["margen"] == approx(e["margen"]) and c["piso_cop"] == approx(e["piso_cop"], abs=1)
+        assert c["flete_max_usd"] == approx(e["flete_maximo_usd"], abs=0.01)
+        assert [l["cop"] for l in c["lineas"]] == approx([l["cop"] for l in e["lineas"]])
     c = vistas.cuentas(o["desglose"])
-    assert c["techo"] == approx(o["oferta"]["techo_usd"]) and c["retiro"] == approx(o["oferta"]["retiro_usd"])
-    assert c["apertura"] == approx(o["oferta"]["apertura_usd"], abs=0.01)
-    assert c["margen"] == approx(o["margen_en_retiro"]) and c["piso"] == approx(o["venta"]["piso_cop"])
-    assert c["lista"] == approx(o["venta"]["lista_cop"]) and c["flete_max"] == approx(o["flete_maximo_cop"])
+    assert c["lista_cop"] == approx(o["venta"]["lista_cop"]) and c["lista_usd"] == approx(c["lista_cop"] / 3270)
+
+
+def test_cuenta_en_javascript_coincide_con_la_de_python(con, tmp_path):
+    import shutil
+    import subprocess
+    if not shutil.which("node"):
+        import pytest
+        pytest.skip("sin node")
+    o = _una_op(con)
+    dg = o["desglose"]
+    js = (vistas.PLANTILLAS / "_cuentas.js").read_text()
+    casos = [(None, None, 0.05), (150, None, 0.10), (300, 6_000_000, 0.0)]
+    prog = js + "\nvar dg=" + json.dumps(dg) + ";console.log(JSON.stringify([" + ",".join(
+        f"cuentasRadar(dg,{'null' if f is None else f},{'null' if r is None else r},{c})" for f, r, c in casos) + "]));"
+    (tmp_path / "c.js").write_text(prog)
+    salida = json.loads(subprocess.run(["node", str(tmp_path / "c.js")], capture_output=True, text=True, check=True).stdout)
+    for (f, r, c), j in zip(casos, salida):
+        py = vistas.cuentas(dg, f, r, c)
+        for k in ("techo", "compra", "apertura", "total_cop", "total_usd", "neto_cop", "neto_usd", "margen", "piso_cop",
+                  "lista_cop", "flete_max_usd", "neto_apertura_cop", "neto_pedido_cop"):
+            assert j[k] == approx(py[k], rel=1e-9, abs=1e-6), k
+        assert [l["cop"] for l in j["lineas"]] == approx([l["cop"] for l in py["lineas"]])
+        assert [l["usd"] for l in j["lineas_pedido"]] == approx([l["usd"] for l in py["lineas_pedido"]])
 
 
 def test_vigilar_cuenta_y_deja_de_insistir():

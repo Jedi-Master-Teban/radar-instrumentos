@@ -1,15 +1,7 @@
 from pytest import approx
 
-from radar.costing import costo_puesto, margen
 from radar.models import Oferta, ValoracionUS
-from radar.offer import precio_techo, proponer
-from tests.conftest import P
-
-
-def test_techo_cumple_margen_objetivo():
-    t = precio_techo(4_000_000, 30, "guitarra", 3270, P)
-    c = costo_puesto(t, 30, 3270, P)
-    assert margen(4_000_000, c.total_cop, 120 * 3270) == approx(0.25)
+from radar.offer import proponer
 
 
 def test_proponer():

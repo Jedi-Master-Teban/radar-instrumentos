@@ -20,7 +20,7 @@ def test_rebaja_actualiza_y_guarda_historial(con):
 def test_parametros_por_defecto(con):
     p = parametros(con)
     assert p["arancel"] == 0.10 and p["iva"] == 0.19 and p["max_alertas_dia"] == 5
-    assert p["flete_supuesto_usd"]["guitarra"] == 120
+    assert p["flete_supuesto_usd"]["guitarra"] == 200 and p["comision_canal"] == 0.05
     assert p["precio_nuevo_min_usd"] == 600 and p["precio_nuevo_max_usd"] == 3500
 
 
