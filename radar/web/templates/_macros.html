@@ -1,3 +1,7 @@
+{% macro foto(o, estilo="", perezosa=True) -%}
+<div class="foto"{% if estilo %} style="{{ estilo }}"{% endif %}><span class="respaldo">{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</span>{% if o.listing.fotos %}<img src="{{ o.listing.fotos[0] }}" alt="" referrerpolicy="no-referrer"{% if perezosa %} loading="lazy"{% endif %} onerror="this.remove()">{% endif %}</div>
+{%- endmacro %}
+
 {% macro chips(o) -%}
 <div class="chips"><span class="chip {{ o.clase }}">{{ o.corto }}</span>{% if o.prioritario %}<span class="chip pri">Neck-thru</span>{% endif %}{% if o.confianza_co == 'baja' %}<span class="chip">Colombia estimado</span>{% endif %}{% if o.banderas %}<span class="chip pri">Revisar</span>{% endif %}{% if o.estado != 'nueva' %}<span class="chip">{{ o.estado }}</span>{% endif %}</div>
 {%- endmacro %}
@@ -8,7 +12,7 @@
 
 {% macro tarjeta(o, e) -%}
 <article class="tarjeta" data-id="{{ o.id }}">
-<div class="foto">{% if o.listing.fotos %}<img src="{{ o.listing.fotos[0] }}" alt="" loading="lazy">{% else %}{{ o.normalizado.marca }} {{ o.normalizado.modelo }}{% endif %}</div>
+{{ foto(o) }}
 <div class="cuerpo">
 {{ chips(o) }}
 <div><h3>{{ o.normalizado.modelo }}</h3><div class="suave pequeno">{{ meta(o) }}</div></div>

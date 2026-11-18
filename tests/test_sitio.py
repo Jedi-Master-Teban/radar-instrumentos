@@ -103,3 +103,19 @@ def test_estado_muestra_cada_tienda(tmp_path, monkeypatch):
     sitio.construir(tmp_path / "s", datos(tmp_path / "d"), HOY, trm=3316.7, colombia=True)
     t = (tmp_path / "s" / "estado.html").read_text()
     assert "no respondió" in t and "sin respuesta" in t and "La Colonial" in t and "0 de 2" in t
+
+
+def test_fotos_con_respaldo_y_conteo_de_faltantes(tmp_path):
+    d = datos(tmp_path / "d")
+    ruta = d / "capturas" / "2026-11-16-reverb-strandberg.json"
+    cap = json.loads(ruta.read_text())
+    cap["publicaciones"][0]["foto"] = "https://rvb-img.reverb.com/i/x.jpg"
+    ruta.write_text(json.dumps(cap))
+    r = construir(tmp_path / "s", d, HOY, trm=3316.7, colombia=False)
+    assert r["sin_foto"] == 5
+    paginas = [(tmp_path / "s" / n).read_text() for n in ("index.html", "explorar.html")]
+    paginas += [p.read_text() for p in (tmp_path / "s").glob("o-*.html")]
+    con_foto = [t for t in paginas if "rvb-img.reverb.com/i/x.jpg" in t]
+    assert con_foto
+    for t in con_foto:  # si la imagen no carga, se quita y queda el nombre del modelo debajo
+        assert 'onerror="this.remove()"' in t and '<span class="respaldo">Strandberg Boden Prog NX 6</span>' in t

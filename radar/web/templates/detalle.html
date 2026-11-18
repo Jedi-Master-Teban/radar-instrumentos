@@ -3,7 +3,7 @@
 {% block cuerpo %}
 <div><a href="{{ e('hoy') }}" class="pequeno">← Volver</a></div>
 <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
-<div class="foto" style="width:300px;max-width:100%;height:210px;border-radius:12px">{% if o.listing.fotos %}<img src="{{ o.listing.fotos[0] }}" alt="">{% else %}{{ o.normalizado.marca }} {{ o.normalizado.modelo }}{% endif %}</div>
+{{ m.foto(o, "width:300px;max-width:100%;height:210px;border-radius:12px", False) }}
 <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:12px">
 {{ m.chips(o) }}
 <h1>{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</h1>

@@ -130,6 +130,8 @@ def construir(salida: Path, datos: Path = DATOS, hoy: date | None = None, trm: f
         db.evento(con, "colombia_tiendas", json.dumps(estado_tiendas, ensure_ascii=False))
         log("Tiendas: " + json.dumps(estado_tiendas, ensure_ascii=False))
     paginas = escribir(con, salida, datos, repo)
-    r = vistas.resumen(vistas.cargar_ops(con)) | {"paginas": paginas, "trm": trm}
+    ops = vistas.cargar_ops(con)
+    r = vistas.resumen(ops) | {"paginas": paginas, "trm": trm,
+                               "sin_foto": sum(1 for o in ops if not o["listing"].get("fotos"))}
     log(json.dumps(r, ensure_ascii=False))
     return r
