@@ -9,6 +9,12 @@
 
 {{ m.estuche(o, e, completo=True, titulo_h="h1") }}
 
+{% if seguida %}<section class="caja" style="padding:24px;display:flex;flex-direction:column;gap:14px" aria-labelledby="t-seguida">
+<div class="seccion-cab"><h2 id="t-seguida">En interés</h2><span class="suave pequeno">Sigues esta publicación desde {{ seguida.en_interes.desde|fecha }} · {{ seguida.etiqueta }}{% if seguida.revisada %} · revisada {{ seguida.revisada|fecha }}{% endif %}</span></div>
+{% if seguida.en_interes.nota %}<p class="nota" style="margin:0">{{ seguida.en_interes.nota }}</p>{% endif %}
+<ul class="historial">{% for h in seguida.historial|reverse %}<li><time datetime="{{ h.fecha }}">{{ h.fecha|fecha }}</time><span>{{ {'live': 'Activa', 'sold': 'Vendida', 'ended': 'Retirada', 'no-encontrada': 'No encontrada'}.get(h.estado, h.estado) }} · {{ h.precio_usd|usd }}</span></li>{% endfor %}</ul>
+</section>{% endif %}
+
 <section class="caja" style="padding:24px;display:flex;flex-direction:column;gap:16px">
 <div class="seccion-cab"><h2>Tu estado</h2>{% if modo != 'local' %}<span class="suave pequeno" id="nota-estado"></span>{% endif %}</div>
 <div class="botones">

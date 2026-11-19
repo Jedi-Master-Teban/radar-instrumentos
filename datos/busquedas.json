@@ -6,6 +6,7 @@
     {"slug": "fender-american-professional-ii-stratocaster", "consulta": "fender american professional ii stratocaster", "categoria": "guitarra", "precio_max": 3500, "paginas": 1},
     {"slug": "prs-se-custom-24", "consulta": "prs se custom 24", "categoria": "guitarra", "precio_max": 3500, "paginas": 1},
     {"slug": "jackson-pro-soloist", "consulta": "jackson pro series soloist", "categoria": "guitarra", "precio_max": 3500, "paginas": 1},
-    {"slug": "music-man-stingray-bass", "consulta": "music man stingray bass", "categoria": "bajo", "precio_max": 3500, "paginas": 1}
+    {"slug": "music-man-stingray-bass", "consulta": "music man stingray bass", "categoria": "bajo", "precio_max": 3500, "paginas": 1},
+    {"slug": "en-interes", "consulta": "Publicaciones en interés", "categoria": "guitarra", "seguir": [{"id": "103081848", "marca": "PRS", "modelo": "SE Custom 24", "categoria": "guitarra", "desde": "2026-11-19", "nota": "Sondeo de mercado sin promesa de compra. El radar la vio el 17 nov; salió de la búsqueda el 18 nov y Reverb la confirmó activa el 19 nov."}]}
   ]
 }

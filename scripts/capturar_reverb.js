@@ -8,6 +8,24 @@ async function capturar(busquedas) {
   for (const b of busquedas) {
     const filas = [], vistos = new Set();
     let estado = 'ok';
+    if (b.seguir) {  // «En interés»: cada anuncio por su número, aunque ya no salga en las búsquedas
+      for (const s of b.seguir) {
+        const r = await fetch('/api/listings/' + encodeURIComponent(s.id), {headers: H});
+        if (r.status === 404) { filas.push([String(s.id), '', 0, '', 0, '', 0, '', 'no-encontrada']); await pausa(800); continue; }
+        if (!r.ok) { estado = 'HTTP ' + r.status; break; }
+        const l = await r.json(), pr = l.price || {};
+        let envio = 0;
+        for (const t of ((l.shipping || {}).rates || [])) if (t.region_code === 'US_CON' && t.rate) envio = parseFloat(t.rate.amount) || 0;
+        const foto = (((((l.photos || [])[0] || {})._links || {}).large_crop || {}).href || '').replace('https://rvb-img.reverb.com/i/', '');
+        // [id, título, precio, estado, acepta ofertas, publicada, envío, foto, estado del anuncio: live | sold | ended…]
+        filas.push([String(l.id || s.id), (l.title || '').replace(/\s+/g, ' ').trim().slice(0, 90), parseFloat(pr.amount) || 0,
+                    (l.condition || {}).slug || '', l.offers_enabled ? 1 : 0, (l.published_at || '').slice(0, 10), envio, foto,
+                    (l.state || {}).slug || 'live']);
+        await pausa(800);
+      }
+      salida.push({slug: b.slug, estado, filas});
+      continue;
+    }
     for (let p = 1; p <= (b.paginas || 1); p++) {
       const q = '/api/listings?query=' + encodeURIComponent(b.consulta) + '&condition=used&item_region=US&per_page=50&page=' + p +
                 (b.precio_max ? '&price_max=' + b.precio_max : '') + (b.precio_min ? '&price_min=' + b.precio_min : '');

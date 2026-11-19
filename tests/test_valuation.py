@@ -76,3 +76,23 @@ def test_cache_us(con):
     v2, _ = referencia_us(con, {"reverb": f}, ModeloFalso(), N, HOY)
     assert v1 == v2 and v1.mediana_usd == approx(810) and f.llamadas == 2  # usado + nuevo, una sola vez
     assert db.parametros(con)["cache_us_dias"] == 7
+
+
+def test_modelo_ausente_en_colombia_se_recuerda_unos_dias(con):
+    vacia, otra = Contador([]), Contador([])
+    fuentes = {"a": vacia, "b": otra}
+    ref, _ = referencia_co(con, fuentes, ModeloFalso(), N, HOY - timedelta(days=2))
+    assert ref.n_usado == 0 and ref.n_nuevo == 0 and ref.usado_cop is None
+    referencia_co(con, fuentes, ModeloFalso(), N, HOY)
+    assert vacia.llamadas == 1  # no se vuelve a preguntar mientras el «no está» siga vigente
+    referencia_co(con, fuentes, ModeloFalso(), N, HOY + timedelta(days=2))
+    assert vacia.llamadas == 2  # el «no está» dura menos que un precio encontrado
+
+
+def test_sin_respuesta_de_la_mayoria_no_se_guarda_un_no_esta(con):
+    caida = Contador(error=RuntimeError("tiempo de espera"))
+    fuentes = {"a": Contador([]), "b": caida, "c": Contador(error=RuntimeError("caída"))}
+    referencia_co(con, fuentes, ModeloFalso(), N, HOY)
+    referencia_co(con, fuentes, ModeloFalso(), N, HOY)
+    assert caida.llamadas == 2
+    assert con.execute("select count(*) from referencias_co").fetchone()[0] == 0

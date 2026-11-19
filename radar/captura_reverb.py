@@ -43,6 +43,14 @@ def armar(filas: list[dict], modelos: dict, datos: Path = DATOS, hoy: date | Non
         if bloque.get("estado", "ok") != "ok" and not bloque.get("filas"):
             resumen.append({"slug": slug, "estado": bloque.get("estado"), "guardadas": 0, "omitidas": 0})
             continue  # se conserva la captura anterior
+        if "seguir" in b:  # publicaciones en interés: una por una, con su estado e historial
+            from . import interes
+            d = interes.fusionar(bloque, b, modelos, datos, hoy)
+            (datos / "capturas" / f"reverb-{slug}.json").write_text(json.dumps(d, ensure_ascii=False, indent=0) + "\n",
+                                                                     encoding="utf-8")
+            resumen.append({"slug": slug, "estado": "ok", "guardadas": len(d["publicaciones"]), "omitidas": 0,
+                            "vendidas_o_retiradas": sum(p.get("anuncio") not in ("live", None) for p in d["publicaciones"])})
+            continue
         pubs, omitidas = [], 0
         for f in bloque.get("filas", []):
             x = dict(zip(CAMPOS, f))

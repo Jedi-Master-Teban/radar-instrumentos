@@ -65,8 +65,13 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo, carpeta_ca
         except (OSError, ValueError):
             return False
 
+    def datos_dir():
+        from ..capturas import CARPETA
+        return (carpeta_capturas or CARPETA).parent
+
     def html(conexion, plantilla: str, activa: str, **ctx) -> HTMLResponse:
-        return HTMLResponse(ENTORNO.get_template(plantilla).render(vistas.contexto(conexion, "local", activa, **ctx)))
+        return HTMLResponse(ENTORNO.get_template(plantilla).render(
+            vistas.contexto(conexion, "local", activa, datos=datos_dir(), **ctx)))
 
     def problemas_de(c, ult) -> list[dict]:
         if not ult:
@@ -153,7 +158,7 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo, carpeta_ca
         ids = {o["id"] for o in dest}
         resto = [o for o in ops if o["id"] not in ids and o["estado"] != "descartada"][:10]
         return html(c, "hoy.html", "hoy", resumen=vistas.resumen(ops), destacadas=dest, resto=resto,
-                    total=len(ops), categorias=vistas.por_categoria(ops))
+                    total=len(ops), categorias=vistas.por_categoria(ops), en_interes=vistas.en_interes(datos_dir(), ops))
 
     @app.get("/explorar", response_class=HTMLResponse)
     def explorar():
@@ -172,7 +177,9 @@ def crear_app(aj: config.Ajustes, lanzar=_lanzar_corrida, vivo=_vivo, carpeta_ca
             raise HTTPException(404, "Oportunidad no encontrada")
         dg = o["desglose"]
         cuentas = vistas.cuentas(dg, o["flete_real_usd"]) if dg else None
-        return html(c, "detalle.html", "", o=o, dg=dg, c=cuentas)
+        seguida = next((x for x in vistas.en_interes(datos_dir(), [o]) if x["id"] == o["listing"]["id_externo"]
+                        and o["listing"]["plataforma"] == "reverb"), None)
+        return html(c, "detalle.html", "", o=o, dg=dg, c=cuentas, seguida=seguida)
 
     @app.post("/oportunidad/{oid}/estado")
     def cambiar_estado(oid: int, estado: str = Form(...)):

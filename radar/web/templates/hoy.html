@@ -27,6 +27,12 @@
 
 {% if modo != 'local' %}<p class="suave pequeno" style="margin:0">Se actualiza sola cada día a las 6:54 a. m. · <a href="{{ e('estado') }}#actualizar" data-con-com>Actualizar ahora</a></p>{% endif %}
 
+<section class="seccion" aria-labelledby="t-interes">
+<div class="seccion-cab"><h2 id="t-interes">En interés</h2><span class="suave pequeno">Las que estás tanteando sin haber ofertado. Se revisan una por una cada mañana.</span></div>
+{% if en_interes %}<div class="caja">{% for x in en_interes %}{{ m.fila_interes(x, e) }}{% endfor %}</div>
+{% else %}<div class="vacio">Todavía no sigues ninguna. En el estuche de una publicación de Reverb, usa «Seguir en interés».</div>{% endif %}
+</section>
+
 {% if resto %}
 <section class="seccion">
 <div class="seccion-cab"><h2>El resto del mercado</h2><a href="{{ e('explorar') }}" data-con-com>Ver las {{ total }} en Explorar</a></div>

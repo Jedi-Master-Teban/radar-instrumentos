@@ -150,3 +150,44 @@ def test_fotos_con_respaldo_y_conteo_de_faltantes(tmp_path):
     assert con_foto
     for t in con_foto:  # si la imagen no carga, se quita y queda el nombre del modelo debajo
         assert 'onerror="this.remove()"' in t and '<span class="respaldo">Strandberg Boden Prog NX 6</span>' in t
+
+
+def test_cache_de_colombia_entre_armados(con, tmp_path):
+    from radar import sitio
+    from radar.valuation import fijar_referencia_manual
+    con.execute("insert into referencias_co(marca, modelo, usado_cop, nuevo_cop, n_usado, n_nuevo, fecha, manual, detalle)"
+                " values('PRS','SE Custom 24',null,5400000,0,3,'2026-11-18',0,'[]')")
+    fijar_referencia_manual(con, "Gibson", "Les Paul Studio", 6_000_000, HOY)
+    ruta = tmp_path / "cache" / "referencias_co.json"
+    assert sitio.guardar_cache(con, ruta) == 1  # las manuales vienen de referencias_co.json, no de la caché
+    otra = db.conectar(":memory:")
+    assert sitio.cargar_cache(otra, ruta) == 1
+    f = otra.execute("select * from referencias_co where marca='PRS'").fetchone()
+    assert f["nuevo_cop"] == 5_400_000 and f["fecha"] == "2026-11-18" and f["manual"] == 0
+    assert sitio.cargar_cache(otra, tmp_path / "no-existe.json") == 0
+
+
+def test_en_interes_en_el_sitio(tmp_path):
+    from radar import interes
+    d = datos(tmp_path / "d")
+    (d / "busquedas.json").write_text(json.dumps({"busquedas": []}))
+    cuerpo = "plataforma: reverb\nmarca: Strandberg\nmodelo: Boden Prog NX 6\ncategoria: guitarra\ntitulo: Strandberg Boden Prog NX 6 #0\nprecio_usd: 1250\nnota: Para sondear"
+    interes.desde_issue(d, "En interés: reverb 0", cuerpo, HOY)
+    cuerpo2 = cuerpo.replace("#0", "vendida").replace("1250", "1400")
+    interes.desde_issue(d, "En interés: reverb 77", cuerpo2, HOY)
+    cap = json.loads((d / "capturas" / interes.ARCHIVO).read_text())
+    cap["publicaciones"][1]["anuncio"] = "sold"
+    (d / "capturas" / interes.ARCHIVO).write_text(json.dumps(cap))
+    salida = tmp_path / "_site"
+    construir(salida, d, HOY, trm=3316.7, colombia=False, repo="dueno/radar")
+    hoy = (salida / "index.html").read_text()
+    seccion = hoy.split('id="t-interes"')[1].split("</section>")[0]
+    assert "Para sondear" in seccion and "Vendida" in seccion and ">Activa<" in seccion
+    assert 'class="esc dinero" data-c="5"' in seccion  # la activa trae su neto por comisión
+    assert "ya no se evalúa" in seccion  # la vendida no
+    assert "Quitar%20de%20inter%C3%A9s%3A%20reverb%2077" in seccion
+    # en el estuche: la seguida ofrece quitar y las demás seguir, con el formulario ya lleno
+    assert "issues/new?title=Quitar%20de%20inter%C3%A9s%3A%20reverb%200" in hoy
+    assert "issues/new?title=En%20inter%C3%A9s%3A%20reverb%209&amp;body=" in hoy and "marca%3A%20Strandberg" in hoy
+    det = next(p.read_text() for p in salida.glob("o-*.html") if "Para sondear" in p.read_text())
+    assert 'id="t-seguida"' in det and "Activa · US$1.250" in det and 'chip interes">En interés' in det

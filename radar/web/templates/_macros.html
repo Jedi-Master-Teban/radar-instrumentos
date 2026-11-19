@@ -3,7 +3,8 @@
 {%- endmacro %}
 
 {% macro chips(o) -%}
-<div class="chips"><span class="chip {{ o.clase }}">{{ o.corto }}</span>{% if o.prioritario %}<span class="chip posible">Neck-thru</span>{% endif %}{% if o.confianza_co == 'baja' %}<span class="chip estimada">Referencia de Colombia estimada</span>{% endif %}{% if o.banderas %}<span class="chip revisar">Revisar</span>{% endif %}{% if o.estado != 'nueva' %}<span class="chip">{{ o.estado|plataforma }}</span>{% endif %}</div>
+{% set seguida = o.listing.plataforma == 'reverb' and o.listing.id_externo in interes_ids %}
+<div class="chips"><span class="chip {{ o.clase }}">{{ o.corto }}</span>{% if seguida %}<span class="chip interes">En interés</span>{% endif %}{% if o.prioritario %}<span class="chip posible">Neck-thru</span>{% endif %}{% if o.confianza_co == 'baja' %}<span class="chip estimada">Referencia de Colombia estimada</span>{% endif %}{% if o.banderas %}<span class="chip revisar">Revisar</span>{% endif %}{% if o.estado != 'nueva' %}<span class="chip">{{ o.estado|plataforma }}</span>{% endif %}</div>
 {%- endmacro %}
 
 {% macro sub(o) -%}
@@ -18,7 +19,7 @@
 {# Fila de la lista de Hoy: neto al precio pedido para cada comisión #}
 {% macro item(o, e, sel=False) -%}
 <a class="item ord" href="{{ e('detalle', o.id) }}" data-con-com data-op="{{ o.id }}" aria-current="{{ 'true' if sel else 'false' }}" style="{% for k, v in o.esc.items() %}--o{{ k }}:{{ (-v.neto_pedido_cop / 1000)|round|int }};{% endfor %}{% if not o.esc %}--o0:99999;--o5:99999;--o10:99999{% endif %}">
-<span class="nom"><b>{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</b><span>{{ o.listing.plataforma|plataforma }} · {{ o.normalizado.estado }} · pide {{ o.listing.precio_usd|usd }}</span>{% if o.confianza_co == 'baja' or o.prioritario %}<span class="chips" style="margin-top:3px">{% if o.confianza_co == 'baja' %}<span class="chip estimada">Referencia estimada</span>{% endif %}{% if o.prioritario %}<span class="chip posible">Neck-thru</span>{% endif %}</span>{% endif %}</span>
+<span class="nom"><b>{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</b><span>{{ o.listing.plataforma|plataforma }} · {{ o.normalizado.estado }} · pide {{ o.listing.precio_usd|usd }}</span>{% if o.confianza_co == 'baja' or o.prioritario or (o.listing.plataforma == 'reverb' and o.listing.id_externo in interes_ids) %}<span class="chips" style="margin-top:3px">{% if o.listing.plataforma == 'reverb' and o.listing.id_externo in interes_ids %}<span class="chip interes">En interés</span>{% endif %}{% if o.confianza_co == 'baja' %}<span class="chip estimada">Referencia estimada</span>{% endif %}{% if o.prioritario %}<span class="chip posible">Neck-thru</span>{% endif %}</span>{% endif %}</span>
 {% if o.esc %}{% for k, v in o.esc.items() %}<span class="esc dinero" data-c="{{ k }}"><span class="monto {{ 'pos' if v.neto_pedido_cop >= 0 else 'neg' }}">{{ v.neto_pedido_cop|scop }}</span><span class="usd">{{ v.neto_pedido_usd|susd }} · {{ v.margen_pedido|spct }}</span></span>{% endfor %}
 {% else %}<span class="dinero"><span class="monto suave">—</span><span class="usd">sin cuenta</span></span>{% endif %}
 </a>
@@ -41,6 +42,7 @@
 <div class="botones">
 {% if o.mensajes %}{% for k, v in o.esc.items() %}<button type="button" class="boton prim pulsar esc" data-c="{{ k }}" data-copiar="{{ o.id }}"{% if not v.apertura %} disabled{% endif %}>{{ ('Copiar oferta de ' ~ (v.apertura|usd)) if v.apertura else 'Sin oferta con esta comisión' }}</button>{% endfor %}{% endif %}
 <a class="boton" href="{{ o.listing.url }}" target="_blank" rel="noopener">Abrir en {{ o.listing.plataforma|plataforma }}</a>
+{% if repo and o.listing.plataforma == 'reverb' %}{% if o.listing.id_externo in interes_ids %}<a class="boton" href="{{ url_quitar(repo, o.listing.id_externo) }}" target="_blank" rel="noopener">Quitar de interés</a>{% else %}<a class="boton" href="{{ url_seguir(repo, o) }}" target="_blank" rel="noopener" title="Abre un formulario de GitHub ya lleno: envíalo y el radar la vigilará cada día">Seguir en interés</a>{% endif %}{% endif %}
 {% if not completo %}<a class="boton" href="{{ e('detalle', o.id) }}" data-con-com>Ver cuentas y comparables</a>{% endif %}
 </div>
 {% for k, txt in o.mensajes.items() %}<p class="oculto" id="msg-{{ o.id }}-{{ k }}">{{ txt }}</p>{% endfor %}{% if o.mensajes %}<span class="suave chico" aria-live="polite" data-copiado="{{ o.id }}"></span>{% endif %}
@@ -91,4 +93,24 @@
 <th class="n">Oferta<small>abre → techo</small></th>
 <th class="n">{% if ordenable %}<button type="button" data-orden="neto">Neto al precio pedido</button>{% else %}Neto al precio pedido{% endif %}<small>COP · USD · margen</small></th>
 </tr>
+{%- endmacro %}
+
+
+{# Una publicación «En interés»: estado del anuncio, precio y neto por comisión #}
+{% macro fila_interes(x, e) -%}
+{% set o = x.o %}
+<div class="seguida">
+<div class="nom">
+<b>{% if o %}<a class="t" href="{{ e('detalle', o.id) }}" data-con-com>{{ x.marca }} {{ x.modelo }}</a>{% else %}{{ x.marca }} {{ x.modelo }}{% endif %}</b>
+<span class="suave pequeno">{{ x.titulo[:70] }}</span>
+<span class="chips"><span class="chip {{ 'interes' if x.activa else 'sinmargen' }}">{{ x.etiqueta }}</span><span class="chip">Sigues desde {{ x.en_interes.desde|fecha }}</span>{% if x.revisada %}<span class="chip">Revisada {{ x.revisada|fecha }}</span>{% endif %}</span>
+{% if x.en_interes.nota %}<span class="suave chico">{{ x.en_interes.nota }}</span>{% endif %}
+</div>
+<div class="cifra" style="align-items:flex-end;text-align:right"><span class="k">Pide</span><span class="v" style="font-size:18px">{{ x.precio_usd|usd }}</span>
+<span class="s">{% if x.cambio_usd < -0.5 %}<span class="pos">bajó {{ (-x.cambio_usd)|usd }}</span>{% elif x.cambio_usd > 0.5 %}<span class="neg">subió {{ x.cambio_usd|usd }}</span>{% else %}sin cambios{% endif %}{% if trm %} · ≈ {{ (x.precio_usd * trm)|millones }}{% endif %}</span></div>
+<div class="cifra" style="align-items:flex-end;text-align:right"><span class="k">Neto al precio pedido</span>
+{% if o and o.esc %}{% for k, v in o.esc.items() %}<span class="esc dinero" data-c="{{ k }}"><span class="v {{ 'pos' if v.neto_pedido_cop >= 0 else 'neg' }}" style="font-size:18px">{{ v.neto_pedido_cop|scop }}</span><span class="usd">{{ v.neto_pedido_usd|susd }} · {{ v.margen_pedido|spct }}</span></span>{% endfor %}
+{% else %}<span class="v suave" style="font-size:18px">—</span><span class="s">{{ 'ya no se evalúa' if not x.activa else 'sin cuenta' }}</span>{% endif %}</div>
+<div class="botones" style="justify-content:flex-end"><a class="boton" href="{{ x.url }}" target="_blank" rel="noopener">Ver en Reverb</a>{% if repo %}<a class="boton" href="{{ url_quitar(repo, x.id) }}" target="_blank" rel="noopener">Quitar</a>{% endif %}</div>
+</div>
 {%- endmacro %}

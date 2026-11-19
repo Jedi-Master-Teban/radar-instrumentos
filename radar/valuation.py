@@ -57,11 +57,14 @@ def precio_reventa_co(ref: ReferenciaCO, p: dict) -> tuple[float, int, str] | No
     return None
 
 
-def _recolectar(con, fuentes: dict, consulta: str, *args) -> list[PrecioTienda]:
+def _recolectar(con, fuentes: dict, consulta: str, *args, respuestas: list | None = None) -> list[PrecioTienda]:
+    """respuestas: si se pasa una lista, se le agrega el nombre de cada fuente que respondió sin error."""
     salida: list[PrecioTienda] = []
     for nombre, fuente in fuentes.items():
         try:
             salida.extend(fuente(consulta, *args))
+            if respuestas is not None:
+                respuestas.append(nombre)
         except LectorBloqueado as e:
             db.evento(con, "lector_bloqueado", f"{nombre}: {e}")
         except Exception as e:  # un sitio caído no detiene la valoración
@@ -117,13 +120,24 @@ def referencia_co(con, fuentes_co: dict, modelo, n: Normalizado, hoy: date) -> t
     """fuentes_co: nombre -> callable(consulta) -> list[PrecioTienda]. El valor manual manda."""
     p = db.parametros(con)
     fila = con.execute("select * from referencias_co where marca=? and modelo=?", (n.marca, n.modelo)).fetchone()
-    if fila and (fila["manual"] or _vigente(fila["fecha"], hoy, p["cache_co_dias"])):
-        return _ref_de_fila(fila), json.loads(fila["detalle"] or "[]")
-    items = _filtrar(modelo, n, _recolectar(con, fuentes_co, f"{n.marca} {n.modelo}"))
-    ref = calcular_referencia_co(items, hoy, p)
-    if not items:  # todo bloqueado o vacío: se conserva la referencia vencida y no se guarda un "sin datos"
-        if fila:
+    if fila:
+        vacia = not (fila["n_usado"] or fila["n_nuevo"]) and fila["usado_cop"] is None
+        dias = p.get("cache_co_vacio_dias", 3) if vacia else p["cache_co_dias"]
+        if fila["manual"] or _vigente(fila["fecha"], hoy, dias):
             return _ref_de_fila(fila), json.loads(fila["detalle"] or "[]")
+    respondieron: list[str] = []
+    items = _filtrar(modelo, n, _recolectar(con, fuentes_co, f"{n.marca} {n.modelo}", respuestas=respondieron))
+    ref = calcular_referencia_co(items, hoy, p)
+    if not items:
+        if fila and (fila["n_usado"] or fila["n_nuevo"]):  # bloqueo o vacío: se conserva la referencia con precios
+            return _ref_de_fila(fila), json.loads(fila["detalle"] or "[]")
+        if fuentes_co and len(respondieron) * 2 >= len(fuentes_co):
+            # La mayoría de las tiendas respondió y ninguna lo tiene: se recuerda el «no está» unos días
+            con.execute("insert into referencias_co(marca, modelo, usado_cop, nuevo_cop, n_usado, n_nuevo, fecha, manual,"
+                        " detalle) values(?,?,null,null,0,0,?,0,'[]') on conflict(marca, modelo) do update set"
+                        " usado_cop=null, nuevo_cop=null, n_usado=0, n_nuevo=0, fecha=excluded.fecha, detalle='[]'",
+                        (n.marca, n.modelo, hoy.isoformat()))
+            con.commit()
         return ref, []
     detalle = [asdict(x) for x in items[:12]]
     con.execute("insert into referencias_co(marca, modelo, usado_cop, nuevo_cop, n_usado, n_nuevo, fecha, manual, detalle)"

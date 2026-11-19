@@ -64,15 +64,18 @@ def escribir(con, salida: Path, datos: Path, repo: str = "") -> int:
     ops = vistas.cargar_ops(con)
     p = db.parametros(con)
 
+    lista_interes = vistas.en_interes(datos, ops)
+    ids_interes = {x["id"] for x in lista_interes}
+
     def pagina(nombre: str, plantilla: str, activa: str, **ctx) -> None:
-        html = env.get_template(plantilla).render(vistas.contexto(con, "estatico", activa, **ctx))
+        html = env.get_template(plantilla).render(vistas.contexto(con, "estatico", activa, interes_ids=ids_interes, **ctx))
         (salida / nombre).write_text(html, encoding="utf-8")
 
     dest = vistas.destacadas(ops)
     ids = {o["id"] for o in dest}
     resto = [o for o in ops if o["id"] not in ids and o["estado"] != "descartada"][:10]
     pagina("index.html", "hoy.html", "hoy", resumen=vistas.resumen(ops), destacadas=dest, resto=resto,
-           total=len(ops), categorias=vistas.por_categoria(ops))
+           total=len(ops), categorias=vistas.por_categoria(ops), en_interes=lista_interes)
     pagina("explorar.html", "explorar.html", "explorar", ops=ops, categorias=vistas.por_categoria(ops),
            marcas=sorted({o["normalizado"]["marca"] for o in ops}),
            plataformas=sorted({o["listing"]["plataforma"] for o in ops}), estados=ESTADOS_OPORTUNIDAD)
@@ -81,7 +84,9 @@ def escribir(con, salida: Path, datos: Path, repo: str = "") -> int:
            tiendas=[t["nombre"] for t in p["tiendas_co"]], p=p)
     for o in ops:
         dg = o["desglose"]
-        pagina(f"o-{o['id']}.html", "detalle.html", "", o=o, dg=dg, c=vistas.cuentas(dg) if dg else None)
+        seguida = next((x for x in lista_interes if x["id"] == o["listing"]["id_externo"]
+                        and o["listing"]["plataforma"] == "reverb"), None)
+        pagina(f"o-{o['id']}.html", "detalle.html", "", o=o, dg=dg, c=vistas.cuentas(dg) if dg else None, seguida=seguida)
     (salida / ".nojekyll").write_text("")
     (salida / "robots.txt").write_text("User-agent: *\nDisallow: /\n")
     return len(ops) + 3
@@ -108,10 +113,38 @@ def vigilar(nombre: str, fuente, estado: dict):
     return consultar
 
 
+
+def cargar_cache(con, ruta: Path | None) -> int:
+    """Restaura las referencias de Colombia de un armado anterior (las que siguen vigentes se reusan)."""
+    if not ruta or not Path(ruta).exists():
+        return 0
+    filas = _leer_json(Path(ruta), [])
+    for f in filas:
+        con.execute("insert or ignore into referencias_co(marca, modelo, usado_cop, nuevo_cop, n_usado, n_nuevo, fecha,"
+                    " manual, detalle) values(?,?,?,?,?,?,?,0,?)",
+                    (f["marca"], f["modelo"], f.get("usado_cop"), f.get("nuevo_cop"), f.get("n_usado") or 0,
+                     f.get("n_nuevo") or 0, f["fecha"], json.dumps(f.get("detalle") or [])))
+    con.commit()
+    return len(filas)
+
+
+def guardar_cache(con, ruta: Path | None) -> int:
+    if not ruta:
+        return 0
+    filas = [{"marca": f["marca"], "modelo": f["modelo"], "usado_cop": f["usado_cop"], "nuevo_cop": f["nuevo_cop"],
+              "n_usado": f["n_usado"], "n_nuevo": f["n_nuevo"], "fecha": f["fecha"],
+              "detalle": json.loads(f["detalle"] or "[]")}
+             for f in con.execute("select * from referencias_co where manual=0 order by marca, modelo")]
+    Path(ruta).parent.mkdir(parents=True, exist_ok=True)
+    Path(ruta).write_text(json.dumps(filas, ensure_ascii=False), encoding="utf-8")
+    return len(filas)
+
 def construir(salida: Path, datos: Path = DATOS, hoy: date | None = None, trm: float | None = None,
-              colombia: bool = True, repo: str = "", log=lambda m: None) -> dict:
+              colombia: bool = True, repo: str = "", log=lambda m: None, cache: Path | None = None) -> dict:
     hoy = hoy or date.today()
     con = db.conectar(":memory:")
+    if cargar_cache(con, cache):
+        log(f"Caché de Colombia restaurada desde {cache}")
     tiendas, estado_tiendas = None, {}
     if colombia:
         from .collectors import tiendas as t
@@ -126,6 +159,7 @@ def construir(salida: Path, datos: Path = DATOS, hoy: date | None = None, trm: f
         tiendas = {x["nombre"]: vigilar(x["nombre"], lambda c, x=x: t.buscar_tienda_co(http, x, c), estado_tiendas)
                    for x in lista}
     trm = preparar(con, datos, hoy, trm, tiendas, log)
+    guardar_cache(con, cache)
     if estado_tiendas:
         db.evento(con, "colombia_tiendas", json.dumps(estado_tiendas, ensure_ascii=False))
         log("Tiendas: " + json.dumps(estado_tiendas, ensure_ascii=False))

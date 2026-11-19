@@ -58,6 +58,7 @@ def millones(x) -> str:
 
 def entorno() -> Environment:
     env = Environment(loader=FileSystemLoader(str(PLANTILLAS)), autoescape=select_autoescape(["html"]))
+    env.globals.update(url_seguir=url_seguir, url_quitar=url_quitar)
     env.filters.update(plataforma=lambda x: {"ebay": "eBay", "reverb": "Reverb", "facebook": "Facebook", "gc": "Guitar Center"}.get(str(x).lower(), str(x).capitalize()),
                        cop=cop_redondo, usd=usd_es, pct=pct, millones=millones, pct1=pct1, trm=lambda x: f"{x:,.1f}".replace(",", "X").replace(".", ",").replace("X", "."),
                        scop=lambda x: "—" if x is None else ("−" if x < 0 else "+") + cop_redondo(abs(x)),
@@ -285,8 +286,50 @@ def capturas_info(carpeta: Path) -> list[dict]:
     return salida
 
 
-def contexto(con, modo: str, activa: str, **extra) -> dict:
+
+def url_seguir(repo: str, o: dict) -> str:
+    """Formulario de GitHub ya lleno para seguir una publicación de Reverb «En interés»."""
+    from urllib.parse import quote
+    l, n = o["listing"], o["normalizado"]
+    cuerpo = "\n".join([
+        "<!-- No cambies las líneas de abajo: el radar las lee. Puedes escribir una nota al final de «nota:». -->",
+        "plataforma: reverb", f"marca: {n['marca']}", f"modelo: {n['modelo']}", f"categoria: {n['categoria']}",
+        f"titulo: {l['titulo']}", f"precio_usd: {l['precio_usd']:g}", f"envio_usd: {l.get('envio_us_usd') or 0:g}",
+        f"estado: {l.get('estado_declarado') or 'good'}", f"ofertas: {1 if l.get('acepta_ofertas') else 0}",
+        f"publicada: {l.get('fecha_publicacion') or ''}", f"foto: {(l.get('fotos') or [''])[0]}", "nota: "])
+    titulo = f"En interés: reverb {l['id_externo']}"
+    return f"https://github.com/{repo}/issues/new?title={quote(titulo)}&body={quote(cuerpo)}"
+
+
+def url_quitar(repo: str, id_externo: str) -> str:
+    from urllib.parse import quote
+    titulo = f"Quitar de interés: reverb {id_externo}"
+    return (f"https://github.com/{repo}/issues/new?title={quote(titulo)}"
+            f"&body={quote('Envía este formulario para dejar de seguir la publicación.')}")
+
+
+def interes_ids(datos: Path | None) -> set[str]:
+    if not datos:
+        return set()
+    from . import interes
+    return {p["id"] for p in interes.lista(datos)}
+
+
+def en_interes(datos: Path | None, ops: list[dict]) -> list[dict]:
+    """Publicaciones en interés con su evaluación, si la tienen (las vendidas o retiradas ya no se evalúan)."""
+    if not datos:
+        return []
+    from . import interes
+    por_id = {o["listing"]["id_externo"]: o for o in ops if o["listing"]["plataforma"] == "reverb"}
+    salida = []
+    for p in interes.lista(datos):
+        o = por_id.get(p["id"]) if p["activa"] else None
+        salida.append({**p, "o": o})
+    return salida
+
+def contexto(con, modo: str, activa: str, datos: Path | None = None, **extra) -> dict:
     p = db.parametros(con)
+    extra.setdefault("interes_ids", interes_ids(datos))
     ult = ultima_actualizacion(con)
     trm = (p.get("trm_cache") or {}).get("valor") or p.get("trm_manual")
     comisiones = sorted(set(p.get("comisiones_escenario") or []) | {p["comision_canal"]})

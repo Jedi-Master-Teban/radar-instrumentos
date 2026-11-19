@@ -55,6 +55,8 @@ def leer_captura(ruta: Path) -> tuple[list[tuple[Listing, Normalizado]], list[Pr
     fuente = str(d.get("fuente", "captura"))
     pares, precios = [], []
     for x in d.get("publicaciones", []):
+        if x.get("anuncio") not in (None, "live"):  # vendida, retirada o no encontrada: no se evalúa
+            continue
         try:
             estado = x.get("estado", "bueno")
             estado = estado if estado in ESTADOS else _ESTADOS_REVERB.get(estado, "bueno")

@@ -56,6 +56,13 @@ html[data-com="{{ k }}"] .ord{order:var(--o{{ k }})}
 .chip.posible,.chip.bajo{border-color:var(--laton);color:var(--laton)}
 .chip.estimada,.chip.revisar{border-color:var(--polvo);color:var(--hueso)}
 .chip.encima,.chip.sinmargen{color:var(--felpa);border-color:var(--forro)}
+.chip.interes{border-color:var(--hueso);color:var(--hueso);font-weight:600}
+.seguida{display:grid;grid-template-columns:minmax(0,2fr) minmax(120px,1fr) minmax(150px,1fr) auto;gap:16px;align-items:center;padding:16px 20px;border-top:1px solid var(--tolex)}
+.seguida:first-child{border-top:0}
+.seguida .nom{display:flex;flex-direction:column;gap:4px;min-width:0}
+.seguida .nom b{font-size:16px}
+.historial{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.historial li{display:flex;gap:12px}.historial time{color:var(--polvo);min-width:7em}
 
 .foto{position:relative;overflow:hidden;background:var(--tolex);border-radius:var(--r);display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:var(--polvo);font-size:14px}
 .foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;outline:1px solid rgba(236,231,222,.1);outline-offset:-1px}
@@ -136,7 +143,9 @@ details summary{cursor:pointer;color:var(--polvo)}
   .envol{padding:0 16px}
   h1{font-size:26px}
   .estuche{padding:20px}
-  .tres{gap:10px}.cifra .v{font-size:18px}.neto .grande{font-size:22px}
+  .tres{gap:10px}.cifra .v{font-size:18px}
+  .seguida{grid-template-columns:minmax(0,1fr) auto;padding:14px 16px}
+  .seguida .nom,.seguida .botones{grid-column:1 / -1}.seguida .botones{justify-content:flex-start!important}.neto .grande{font-size:22px}
   .lineas td,.lineas th{padding:10px 6px}.lineas th{white-space:normal}.caja{padding:16px!important}
   .estuche .foto{flex-basis:100%;height:200px}
   .cascada{grid-template-columns:minmax(0,1fr) auto;gap:4px 12px}

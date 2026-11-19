@@ -1,0 +1,67 @@
+name: En interés
+
+# Agrega o quita una publicación de «En interés» desde el botón del sitio, que abre un formulario (issue) ya lleno.
+# Solo se procesan los formularios del dueño del repositorio.
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: en-interes
+  cancel-in-progress: false
+
+jobs:
+  guardar:
+    if: >-
+      github.event.issue.user.login == github.repository_owner &&
+      (startsWith(github.event.issue.title, 'En interés:') || startsWith(github.event.issue.title, 'Quitar de interés:'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+      - name: Guardar el cambio
+        id: cambio
+        env:
+          TITULO: ${{ github.event.issue.title }}
+          CUERPO: ${{ github.event.issue.body }}
+        run: |
+          printf '%s' "$CUERPO" > /tmp/cuerpo.txt
+          set +e
+          python -m radar interes "$TITULO" /tmp/cuerpo.txt > /tmp/mensaje.txt 2>&1
+          echo "codigo=$?" >> "$GITHUB_OUTPUT"
+          cat /tmp/mensaje.txt
+      - name: Subir y volver a armar el sitio
+        if: steps.cambio.outputs.codigo == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITULO: ${{ github.event.issue.title }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add datos/busquedas.json datos/capturas/reverb-en-interes.json
+          git commit -m "datos: $TITULO" || true
+          git pull --rebase -q && git push -q
+          gh workflow run sitio.yml --ref main
+      - name: Responder y cerrar el formulario
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMERO: ${{ github.event.issue.number }}
+          CODIGO: ${{ steps.cambio.outputs.codigo }}
+        run: |
+          if [ "$CODIGO" = "0" ]; then
+            printf '%s\n\nEl sitio se actualiza en unos minutos. La tarea de las 7 a. m. revisará cada día si sigue activa, si cambió de precio o si se vendió.' "$(cat /tmp/mensaje.txt)" > /tmp/respuesta.txt
+            gh issue close "$NUMERO" --comment "$(cat /tmp/respuesta.txt)"
+          else
+            printf 'No pude guardar el cambio:\n\n```\n%s\n```' "$(cat /tmp/mensaje.txt 2>/dev/null)" > /tmp/respuesta.txt
+            gh issue comment "$NUMERO" --body "$(cat /tmp/respuesta.txt)"
+          fi

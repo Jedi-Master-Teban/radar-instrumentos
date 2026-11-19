@@ -27,8 +27,19 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -e .
+      # Precios de Colombia de armados anteriores: los vigentes no se vuelven a consultar en las tiendas
+      - uses: actions/cache/restore@v4
+        with:
+          path: .cache/referencias_co.json
+          key: colombia-${{ github.run_id }}
+          restore-keys: colombia-
       - name: Construir el sitio
-        run: python -m radar sitio --salida _site --repo "${{ github.repository }}"
+        run: python -m radar sitio --salida _site --repo "${{ github.repository }}" --cache .cache/referencias_co.json
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .cache/referencias_co.json
+          key: colombia-${{ github.run_id }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

@@ -21,6 +21,7 @@ PARAMETROS_DEFECTO: dict = {
     "ajuste_luthier_cop": {"guitarra": 150000, "bajo": 150000, "pedal": 0, "cuerdas": 0},
     "min_refs_co": 3,
     "cache_co_dias": 7,
+    "cache_co_vacio_dias": 3,  # días que se recuerda que un modelo no está en las tiendas de Colombia
     "cache_us_dias": 7,
     "margen_objetivo": 0.25,
     "max_alertas_dia": 5,

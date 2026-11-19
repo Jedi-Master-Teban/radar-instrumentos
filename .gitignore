@@ -8,3 +8,4 @@ __pycache__/
 .superpowers/
 _site/
 _to_delete/
+.cache/
