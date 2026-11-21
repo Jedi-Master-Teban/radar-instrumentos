@@ -1,0 +1,728 @@
+diff --git a/radar/vistas.py b/radar/vistas.py
+index 2d1ae0b..1fba2d2 100644
+--- a/radar/vistas.py
++++ b/radar/vistas.py
+@@ -2,6 +2,8 @@
+ from __future__ import annotations
+ 
+ import json
++import math
++from datetime import datetime
+ from pathlib import Path
+ 
+ from jinja2 import Environment, FileSystemLoader, select_autoescape
+@@ -45,11 +47,38 @@ def usd_es(x) -> str:
+ 
+ 
+ def pct1(x) -> str:
+-    return "—" if x is None else f"{x * 100:.1f} %".replace(".", ",").replace(",0 %", " %")
++    return "—" if x is None else f"{x * 100:.1f}\u00a0%".replace(".", ",").replace(",0\u00a0%", "\u00a0%")
+ 
+ 
+ def pct(x) -> str:
+-    return "—" if x is None else f"{x * 100:.0f} %"
++    return "—" if x is None else f"{x * 100:.0f}\u00a0%"
++
++
++def usd_cent(x) -> str:
++    """Dólares con centavos en formato es-CO: US$1.650,00."""
++    if x is None:
++        return "—"
++    s = f"{abs(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
++    return ("−" if x < 0 else "") + "US$" + s
++
++
++MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
++
++
++def fecha_es(s) -> str:
++    """'2026-11-20T06:54:00' -> '20 nov 2026, 6:54 a. m.'; '2026-11-20' -> '20 nov 2026'."""
++    if not s:
++        return "—"
++    s = str(s)
++    try:
++        d = datetime.fromisoformat(s[:19])
++    except ValueError:
++        return s[:16]
++    txt = f"{d.day} {MESES[d.month - 1]} {d.year}"
++    if len(s) > 10:
++        h = d.hour % 12 or 12
++        txt += f", {h}:{d.minute:02d}\u00a0{'a.' if d.hour < 12 else 'p.'}\u00a0m."
++    return txt
+ 
+ 
+ def millones(x) -> str:
+@@ -63,8 +92,9 @@ def entorno() -> Environment:
+                        cop=cop_redondo, usd=usd_es, pct=pct, millones=millones, pct1=pct1, trm=lambda x: f"{x:,.1f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                        scop=lambda x: "—" if x is None else ("−" if x < 0 else "+") + cop_redondo(abs(x)),
+                        susd=lambda x: "—" if x is None else ("−" if x < 0 else "+") + usd_es(abs(x)),
+-                       usdes=lambda x: usd_es(x), spct=lambda x: "—" if x is None else ("−" if x < 0 else "+") + f"{abs(x) * 100:.0f} %",
+-                       fecha=lambda s: "—" if not s else str(s)[:16].replace("T", " "))
++                       usdes=lambda x: usd_es(x), spct=lambda x: "—" if x is None else ("−" if x < 0 else "+") + f"{abs(x) * 100:.0f}\u00a0%",
++                       usd2=usd_cent, susd2=lambda x: "—" if x is None else ("−" if x < 0 else "+") + usd_cent(abs(x)),
++                       fecha=fecha_es)
+     return env
+ 
+ 
+@@ -163,12 +193,71 @@ def _pasos(lineas: list[dict], comision_cop: float, neto_cop: float, trm: float,
+     return salida
+ 
+ 
+-def escenarios_vista(d: dict) -> dict:
++def repartir(valores: list[float], unidad: float) -> list:
++    """Redondea cada valor a `unidad` (1000 para pesos, 0.01 para dólares) de modo que la suma de lo
++    redondeado sea exactamente el total redondeado (método del mayor resto). Valores >= 0."""
++    escalados = [v / unidad for v in valores]
++    base = [math.floor(x + 1e-9) for x in escalados]
++    faltan = round(sum(escalados)) - sum(base)
++    orden = sorted(range(len(valores)), key=lambda i: escalados[i] - base[i], reverse=True)
++    for i in orden[:max(faltan, 0)]:
++        base[i] += 1
++    return [round(b * unidad, 2) if unidad < 1 else int(b * unidad) for b in base]
++
++
++TRAMOS = [(1, "Compra en Miami", "Pagas en dólares", "usd"),
++          (2, "Envío a Bogotá", "Pagas en dólares", "usd"),
++          (3, "Aduana en Bogotá", "Pagas en pesos", "cop"),
++          (4, "Puesta a punto", "Pagas en pesos", "cop")]
++
++
++def guia(d: dict, p: dict, comision: float, neto_cop: float) -> dict:
++    """Guía de embarque al precio pedido: tramos de costo en USD y COP que cuadran a la vista,
++    y la venta con la comisión dada. `neto_cop` es el neto exacto del escenario (el de la lista)."""
++    c, trm, ref = d["costo_pedido"], d["trm"], d["precio_co_cop"]
++    L = c["lineas"]
++    flete, seguro = c["flete_usd"], c["seguro_usd"]
++    inspeccion = L[2]["usd"] - flete - seguro
++    envio_us = d["listing"].get("envio_us_usd") or 0
++    crudas = [  # (tramo, concepto, cómo se calcula, usd exacto)
++        (1, "Precio pedido y envío en EE. UU." if envio_us else "Precio pedido", "", L[0]["usd"]),
++        (1, "Impuesto de ventas", f"{pct(p.get('sales_tax_us', 0.07))} del precio", L[1]["usd"]),
++        (2, "Flete del casillero", "", flete),
++        (2, "Seguro", f"{pct1(p.get('seguro_pct', 0.035))} del precio", seguro),
++        (2, "Inspección", "", inspeccion),
++        (2, "Recargo de la tarjeta", f"{pct1(p.get('margen_cambiario', 0.015))} de compra y envío", L[3]["usd"]),
++        (3, "Arancel", f"{pct(p.get('arancel', 0.10))} de precio + flete + seguro", L[4]["usd"]),
++        (3, "IVA", f"{pct(p.get('iva', 0.19))} de lo anterior + arancel", L[5]["usd"]),
++        (4, "Ajuste del luthier", "", L[6]["usd"]),
++    ]
++    crudas = [x for x in crudas if x[3] > 0.004]
++    usd_r = repartir([x[3] for x in crudas], 0.01)
++    cop_r = repartir([x[3] * trm for x in crudas], 1000)
++    tramos = []
++    for n, titulo, paga, moneda in TRAMOS:
++        filas = [{"concepto": x[1], "base": x[2], "usd": u, "cop": k}
++                 for x, u, k in zip(crudas, usd_r, cop_r) if x[0] == n]
++        if filas:
++            tramos.append({"n": n, "titulo": titulo, "paga": paga, "moneda": moneda, "lineas": filas,
++                           "subtotal": {"usd": round(sum(f["usd"] for f in filas), 2),
++                                        "cop": sum(f["cop"] for f in filas)}})
++    costo = {"usd": round(sum(usd_r), 2), "cop": sum(cop_r)}
++    cierre = {"usd": round(ref / trm, 2), "cop": int(round(ref, -3))}
++    neto = {"usd": round(neto_cop / trm, 2), "cop": int(round(neto_cop, -3))}
++    # la comisión absorbe el residuo del redondeo (a lo sumo $1.000 o US$0,01)
++    com = {"usd": round(cierre["usd"] - costo["usd"] - neto["usd"], 2), "cop": cierre["cop"] - costo["cop"] - neto["cop"]}
++    return {"tramos": tramos, "costo": costo, "n_venta": len(tramos) + 1,
++            "venta": {"cierre": cierre, "comision": com, "neto": neto, "comision_pct": comision,
++                      "margen": neto_cop / c["total_cop"] if c["total_cop"] else 0}}
++
++
++def escenarios_vista(d: dict, p: dict | None = None) -> dict:
+     """Cifras por comisión, en USD y COP, para la lista, el estuche y la tabla."""
+     esc, cp, v = d.get("escenarios") or {}, d.get("costo_pedido"), d.get("venta")
+     if not esc or not cp or not v:
+         return {}
+     trm, ref = d["trm"], d["precio_co_cop"]
++    p = p or db.PARAMETROS_DEFECTO
+     salida = {}
+     for k, e in esc.items():
+         com = e["comision"]
+@@ -183,6 +272,7 @@ def escenarios_vista(d: dict) -> dict:
+             "comision_cop": comision_cop, "comision_usd": comision_cop / trm, "piso_cop": e["piso_cop"],
+             "piso_usd": e["piso_usd"], "flete_max_usd": e.get("flete_maximo_usd"),
+             "pasos": _pasos(cp["lineas"], comision_cop, e["neto_pedido_cop"], trm, com),
++            "guia": guia(d, p, com, e["neto_pedido_cop"]),
+         }
+     return salida
+ 
+@@ -213,7 +303,7 @@ def cargar_ops(con) -> list[dict]:
+              "orden": orden, "categoria": d["normalizado"]["categoria"]}
+         o["destacable"] = clase in ("reventa", "ganga", "posible", "bajo") or bool(o.get("prioritario"))
+         o["desglose"] = _desglose(d, p)
+-        o["esc"] = escenarios_vista(d)
++        o["esc"] = escenarios_vista(d, p)
+         o["com_def"] = str(round(d.get("comision", p["comision_canal"]) * 100))
+         o["texto_mensaje"] = mensaje(d)
+         o["mensajes"] = {k: mensaje(d, x["apertura"]) for k, x in o["esc"].items() if x["apertura"]}
+diff --git a/radar/web/templates/_macros.html b/radar/web/templates/_macros.html
+index 9440e4c..46baca6 100644
+--- a/radar/web/templates/_macros.html
++++ b/radar/web/templates/_macros.html
+@@ -19,25 +19,47 @@
+ {# Fila de la lista de Hoy: neto al precio pedido para cada comisión #}
+ {% macro item(o, e, sel=False) -%}
+ <a class="item ord" href="{{ e('detalle', o.id) }}" data-con-com data-op="{{ o.id }}" aria-current="{{ 'true' if sel else 'false' }}" style="{% for k, v in o.esc.items() %}--o{{ k }}:{{ (-v.neto_pedido_cop / 1000)|round|int }};{% endfor %}{% if not o.esc %}--o0:99999;--o5:99999;--o10:99999{% endif %}">
+-<span class="nom"><b>{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</b><span>{{ o.listing.plataforma|plataforma }} · {{ o.normalizado.estado }} · pide {{ o.listing.precio_usd|usd }}</span>{% if o.confianza_co == 'baja' or o.prioritario or (o.listing.plataforma == 'reverb' and o.listing.id_externo in interes_ids) %}<span class="chips" style="margin-top:3px">{% if o.listing.plataforma == 'reverb' and o.listing.id_externo in interes_ids %}<span class="chip interes">En interés</span>{% endif %}{% if o.confianza_co == 'baja' %}<span class="chip estimada">Referencia estimada</span>{% endif %}{% if o.prioritario %}<span class="chip posible">Neck-thru</span>{% endif %}</span>{% endif %}</span>
++<span class="mini">{% if o.listing.fotos %}<img src="{{ o.listing.fotos[0] }}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.remove()">{% endif %}</span>
++<span class="nom"><b>{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</b><span>{{ o.listing.plataforma|plataforma }} · {{ o.normalizado.estado }} · pide {{ o.listing.precio_usd|usd }}</span>{% if o.prioritario or (o.listing.plataforma == 'reverb' and o.listing.id_externo in interes_ids) %}<span class="chips" style="margin-top:3px">{% if o.listing.plataforma == 'reverb' and o.listing.id_externo in interes_ids %}<span class="chip interes">En interés</span>{% endif %}{% if o.prioritario %}<span class="chip posible">Neck-thru</span>{% endif %}</span>{% endif %}</span>
+ {% if o.esc %}{% for k, v in o.esc.items() %}<span class="esc dinero" data-c="{{ k }}"><span class="monto {{ 'pos' if v.neto_pedido_cop >= 0 else 'neg' }}">{{ v.neto_pedido_cop|scop }}</span><span class="usd">{{ v.neto_pedido_usd|susd }} · {{ v.margen_pedido|spct }}</span></span>{% endfor %}
+ {% else %}<span class="dinero"><span class="monto suave">—</span><span class="usd">sin cuenta</span></span>{% endif %}
+ </a>
+ {%- endmacro %}
+ 
+-{# Estuche: oferta, cascada al precio pedido y venta, en USD y COP para cada comisión #}
++{# Guía de embarque: costo por tramos y venta, en USD y COP (ver DESIGN.md) #}
++{% macro guia(o, v) -%}
++{% set g = v.guia %}
++<div class="guia" role="group" aria-label="Guía de embarque: de dónde sale el neto">
++<div class="guia-cab"><span>Guía de embarque · TRM {{ o.trm|trm }} · comisión {{ (v.comision * 100)|round|int }}&nbsp;%</span><span class="guia-num" translate="no">{{ (o.listing.plataforma|plataforma)|upper }} {{ o.listing.id_externo }}</span></div>
++<div class="ruta" aria-hidden="true"><span class="sten">MIA</span><i></i><span class="escala">casillero<br>y vuelo</span><i></i><span class="sten">BOG</span></div>
++<div class="guia-fila guia-tit"><span>Concepto</span><span class="base">Cómo se calcula</span><span class="n">USD</span><span class="n">COP</span></div>
++{% for t in g.tramos %}<div class="tramo" data-paga="{{ t.moneda }}">
++<div class="tramo-cab"><span class="sten">{{ t.n }} · {{ t.titulo }}</span><span class="paga">{{ t.paga }}</span></div>
++{% for l in t.lineas %}<div class="guia-fila"><span class="con">{{ l.concepto }}{% if l.base %}<small>{{ l.base }}</small>{% endif %}</span><span class="base">{{ l.base }}</span><span class="n usd">{{ l.usd|usd2 }}</span><span class="n cop">{{ l.cop|cop }}</span></div>
++{% endfor %}{% if t.lineas|length > 1 %}<div class="guia-fila sub"><span class="con">Subtotal</span><span class="base"></span><span class="n">{{ t.subtotal.usd|usd2 }}</span><span class="n">{{ t.subtotal.cop|cop }}</span></div>{% endif %}
++</div>
++{% endfor %}<div class="guia-fila total"><span class="con">Costo puesto en Bogotá</span><span class="base">{{ g.tramos|map(attribute='n')|join(' + ') }}</span><span class="n">{{ g.costo.usd|usd2 }}</span><span class="n">{{ g.costo.cop|cop }}</span></div>
++<div class="tramo venta" data-paga="cop">
++<div class="tramo-cab"><span class="sten">{{ g.n_venta }} · Venta en Bogotá</span><span class="paga">Cobras en pesos</span></div>
++<div class="guia-fila"><span class="con">Cierre esperado<small>{{ 'estimado' if o.confianza_co == 'baja' else 'con tiendas de Colombia' }}</small></span><span class="base">{{ 'estimado' if o.confianza_co == 'baja' else 'con tiendas de Colombia' }}</span><span class="n usd">{{ g.venta.cierre.usd|usd2 }}</span><span class="n cop">{{ g.venta.cierre.cop|cop }}</span></div>
++{% if g.venta.comision_pct > 0 %}<div class="guia-fila"><span class="con">Comisión del vendedor<small>{{ g.venta.comision_pct|pct }} del cierre</small></span><span class="base">{{ g.venta.comision_pct|pct }} del cierre</span><span class="n usd">{{ (-g.venta.comision.usd)|usd2 }}</span><span class="n cop">{{ (-g.venta.comision.cop)|scop }}</span></div>{% endif %}
++<div class="guia-fila"><span class="con">Costo puesto<small>viene de arriba</small></span><span class="base">viene de arriba</span><span class="n usd">{{ (-g.costo.usd)|usd2 }}</span><span class="n cop">{{ (-g.costo.cop)|scop }}</span></div>
++<div class="guia-fila neto"><span class="con">Neto<small>{{ g.venta.margen|spct }} sobre el costo puesto</small></span><span class="base">{{ g.venta.margen|spct }} sobre el costo puesto</span><span class="n usd">{{ g.venta.neto.usd|susd2 }}</span><span class="n cop{{ ' neg' if g.venta.neto.cop < 0 }}">{{ g.venta.neto.cop|scop }}</span></div>
++</div></div>
++{%- endmacro %}
++
++{# Estuche: cinta con la oferta, botones y guía de embarque, en USD y COP para cada comisión #}
+ {% macro estuche(o, e, completo=False, titulo_h="h2") -%}
+ <section class="estuche" aria-label="Estuche de {{ o.normalizado.marca }} {{ o.normalizado.modelo }}" data-estuche="{{ o.id }}">
+ <div class="cabeza">
+ {{ foto(o, perezosa=not completo) }}
+ <div class="datos">
+ {{ chips(o) }}
+-<div><{{ titulo_h }} style="font-size:26px">{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</{{ titulo_h }}>
++<div><{{ titulo_h }} class="sten modelo">{{ o.normalizado.marca }} {{ o.normalizado.modelo }}</{{ titulo_h }}>
+ <p class="suave pequeno" style="margin:6px 0 0">{{ sub(o) }}</p></div>
+-{% if o.esc %}{% for k, v in o.esc.items() %}<div class="tres esc" data-c="{{ k }}">
+-<div class="cifra"><span class="k">Abre con</span><span class="v pos">{{ v.apertura|usd if v.apertura else '—' }}</span><span class="s">{{ ('≈ ' ~ (v.apertura * o.trm)|millones) if v.apertura else 'sin oferta' }}</span></div>
+-<div class="cifra"><span class="k">Pide</span><span class="v">{{ o.listing.precio_usd|usd }}</span><span class="s">≈ {{ (o.listing.precio_usd * o.trm)|millones }}{% if o.listing.envio_us_usd %} · envío {{ o.listing.envio_us_usd|usd }}{% endif %}</span></div>
+-<div class="cifra"><span class="k">Techo ({{ p.margen_objetivo|pct }} neto)</span><span class="v">{{ v.techo|usd if v.techo > 0 else '—' }}</span><span class="s">{{ ('≈ ' ~ (v.techo * o.trm)|millones) if v.techo > 0 else 'ni regalada' }}</span></div>
++{% if o.esc %}{% for k, v in o.esc.items() %}<div class="esc" data-c="{{ k }}" style="display:flex;flex-direction:column;gap:6px">
++{% if v.apertura %}<span class="gaffer sten">Techo {{ v.techo|usd }} · abre {{ v.apertura|usd }}</span>{% else %}<span class="gaffer sten">Sin oferta con esta comisión</span>{% endif %}
++<span class="suave pequeno">Pide {{ o.listing.precio_usd|usd }} ≈ {{ (o.listing.precio_usd * o.trm)|millones }}{% if v.apertura %} · abre ≈ {{ (v.apertura * o.trm)|millones }} · el techo deja el {{ p.margen_objetivo|pct }} neto{% endif %}</span>
+ </div>{% endfor %}{% endif %}
+ <div class="botones">
+ {% if o.mensajes %}{% for k, v in o.esc.items() %}<button type="button" class="boton prim pulsar esc" data-c="{{ k }}" data-copiar="{{ o.id }}"{% if not v.apertura %} disabled{% endif %}>{{ ('Copiar oferta de ' ~ (v.apertura|usd)) if v.apertura else 'Sin oferta con esta comisión' }}</button>{% endfor %}{% endif %}
+@@ -49,22 +71,16 @@
+ </div></div>
+ {% for b in o.banderas %}<p class="aviso">{{ b }}</p>{% endfor %}
+ {% if o.esc %}{% for k, v in o.esc.items() %}<div class="esc" data-c="{{ k }}" style="display:flex;flex-direction:column;gap:14px">
+-<div class="seccion-cab"><h3>A dónde va cada peso de la venta</h3><span class="suave pequeno">Comprando al precio pedido, {{ o.listing.precio_usd|usd }} · TRM {{ o.trm|trm }}</span></div>
+-<div class="cascada" role="img" aria-label="Venta de {{ o.precio_co_cop|cop }}: {% for s in v.pasos %}{{ s.etiqueta }} {{ s.cop|cop }}{{ ', ' if not loop.last }}{% endfor %}">
+-<span class="tit"></span><span class="tit"></span><span class="tit">USD</span><span class="tit">COP</span>
+-{% for s in v.pasos %}{% set fuerte = s.tipo in ('ganancia', 'perdida') %}
+-<span class="et{{ ' fuerte' if fuerte }}">{{ s.etiqueta }}</span>
+-<span class="c{{ ' fuerte ' ~ ('pos' if s.tipo == 'ganancia' else 'neg') if fuerte }}">{{ (s.cop|scop) if fuerte else (s.cop|cop) }} <span class="ux">· {{ (s.usd|susd) if fuerte else (s.usd|usd) }}</span></span>
+-<span class="u{{ ' fuerte ' ~ ('pos' if s.tipo == 'ganancia' else 'neg') if fuerte }}">{{ (s.usd|susd) if fuerte else (s.usd|usd) }}</span>
+-<span class="barra"><i class="{{ s.tipo }}" style="left:{{ s.izq }}%;width:{{ s.ancho }}%"></i></span>
+-{% endfor %}</div>
++{% set hsub = 'h2' if titulo_h == 'h1' else 'h3' %}
++<div class="seccion-cab"><{{ hsub }}>De dónde sale el neto</{{ hsub }}><span class="suave pequeno">Comprando al precio pedido, {{ o.listing.precio_usd|usd }} · TRM {{ o.trm|trm }}</span></div>
++{{ guia(o, v) }}
+ <div class="tres">
+ <div class="cifra"><span class="k">Publica en</span><span class="v" style="font-size:18px">{{ o.venta.lista_cop|cop }}</span><span class="s">{{ (o.venta.lista_cop / o.trm)|usd }}</span></div>
+ <div class="cifra"><span class="k">Cierre esperado</span><span class="v" style="font-size:18px">{{ o.venta.objetivo_cop|cop }}</span><span class="s">{{ (o.venta.objetivo_cop / o.trm)|usd }} · {{ 'estimada' if o.confianza_co == 'baja' else o.origen_co }}</span></div>
+ <div class="cifra"><span class="k">Piso ({{ p.margen_objetivo|pct }} neto)</span><span class="v" style="font-size:18px">{{ v.piso_cop|cop }}</span><span class="s">{{ v.piso_usd|usd }}</span></div>
+ </div>
+-<div class="neto"><span class="suave">Neto al precio pedido</span><span class="grande {{ 'pos' if v.neto_pedido_cop >= 0 else 'neg' }}">{{ v.neto_pedido_cop|scop }}</span><span style="font-size:18px;font-weight:600">{{ v.neto_pedido_usd|susd }}</span><span class="suave">{{ v.margen_pedido|spct }} sobre el costo</span></div>
+-<p class="nota">{% if v.hay_oferta %}Si el vendedor acepta {{ v.apertura|usd }}: {{ v.neto_apertura_cop|scop }} · {{ v.neto_apertura_usd|susd }} ({{ v.margen_apertura|spct }}). {% if v.techo >= o.listing.precio_usd %}El techo ({{ v.techo|usd }}) está por encima de lo que piden: aun pagando el precio pedido queda más del {{ p.margen_objetivo|pct }}.{% else %}Pagando el techo de {{ v.techo|usd }}: {{ v.neto_techo_cop|scop }} · {{ v.neto_techo_usd|susd }} ({{ p.margen_objetivo|pct }}).{% endif %}{% else %}Con esta comisión no hay una oferta razonable que deje el {{ p.margen_objetivo|pct }}: el techo queda por debajo del 60 % del precio pedido.{% endif %}{% if o.confianza_co == 'baja' %} La referencia de Colombia es estimada: confírmala con tu vendedor antes de ofertar.{% endif %}</p>
++
++<p class="nota">{% if v.hay_oferta %}Si el vendedor acepta {{ v.apertura|usd }}: {{ v.neto_apertura_cop|scop }} · {{ v.neto_apertura_usd|susd }} ({{ v.margen_apertura|spct }}). {% if v.techo >= o.listing.precio_usd %}El techo ({{ v.techo|usd }}) está por encima de lo que piden: aun pagando el precio pedido queda más del {{ p.margen_objetivo|pct }}.{% else %}Pagando el techo de {{ v.techo|usd }}: {{ v.neto_techo_cop|scop }} · {{ v.neto_techo_usd|susd }} ({{ p.margen_objetivo|pct }}).{% endif %}{% else %}Con esta comisión no hay una oferta razonable que deje el {{ p.margen_objetivo|pct }}: el techo queda por debajo del 60&nbsp;% del precio pedido.{% endif %}{% if o.confianza_co == 'baja' %} La referencia de Colombia es estimada: confírmala con tu vendedor antes de ofertar.{% endif %}</p>
+ </div>{% endfor %}
+ {% else %}<p class="aviso">{% if not o.valoracion_us %}Hay menos de 3 publicaciones del mismo modelo en EE. UU.: no hay mediana para valorarla ni oferta sugerida. Puesta en Bogotá al precio pedido costaría {{ o.costo.total_cop|cop }} · {{ o.costo.total_usd|usd }}.{% else %}Sin cuenta de compra y venta para esta publicación.{% endif %}</p>{% endif %}
+ </section>
+diff --git a/radar/web/templates/base.html b/radar/web/templates/base.html
+index a6cf043..a6e69d9 100644
+--- a/radar/web/templates/base.html
++++ b/radar/web/templates/base.html
+@@ -4,43 +4,45 @@
+ <title>{% block titulo %}Radar de instrumentos{% endblock %}</title>
+ {% if modo == 'estatico' %}<meta name="robots" content="noindex, nofollow">{% endif %}
+ <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..700&display=swap">
++<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil:opsz,wght@10..72,500..900&family=Schibsted+Grotesk:wght@400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+ <style>
+-/* Dirección B «Estuche abierto» (ver DESIGN.md). Superficies en vez de bordes; sombra solo en la hoja móvil. */
+-:root{--tolex:#1E2024;--forro:#2A2D33;--forro2:#25282D;--hueso:#ECE7DE;--polvo:#A8A196;--laton:#D2AE5E;--felpa:#E0776A;
++/* Dirección B «Road case MIA → BOG» (ver DESIGN.md). Bordes de 1 px en aluminio; sombra solo en la hoja móvil. */
++:root{--estuche:#1A1B1E;--laminado:#25272B;--laminado2:#2C2F34;--aluminio:#AEB4BB;--cinta:#ECE5D2;--tinta:#16181D;--tinta2:#4A4E57;
++--raya:#C9C0A8;--total:#E2D9C2;--naranja:#FF6B1A;--fragil:#FF5A5F;
+ --ease-out:cubic-bezier(0.23,1,0.32,1);--ease-drawer:cubic-bezier(0.32,0.72,0,1);--t-press:140ms;--t-estado:200ms;--t-hoja:280ms;
+---r:6px;--r2:10px}
++--r:0;--r2:0}
+ *{box-sizing:border-box}html{color-scheme:dark;-webkit-text-size-adjust:100%}
+-body{margin:0;background:var(--tolex);color:var(--hueso);font:16px/1.5 Archivo,system-ui,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+-a{color:var(--laton)}a:hover{color:var(--hueso)}
+-h1,h2,h3{margin:0;font-weight:650;font-stretch:112%;line-height:1.15;text-wrap:balance}
+-h1{font-size:34px}h2{font-size:22px}h3{font-size:17px;font-stretch:100%}
++body{margin:0;background:var(--estuche);color:var(--cinta);font:16px/1.5 "Schibsted Grotesk",system-ui,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
++a{color:var(--naranja)}a:hover{color:var(--cinta)}
++h1,h2,h3{margin:0;line-height:1.1;text-wrap:balance}
++h1,h2,.sten{font-family:"Big Shoulders Stencil","Schibsted Grotesk",sans-serif;font-weight:800;letter-spacing:.01em;text-transform:uppercase}
++h1{font-size:40px}h2{font-size:26px}h3{font-size:17px;font-weight:700}
+ p{text-wrap:pretty}
+ .envol{max-width:1376px;margin:0 auto;padding:0 32px}
+-.suave{color:var(--polvo)}.pequeno{font-size:13px}.chico{font-size:12px}.angosto{font-stretch:88%}
+-.pos{color:var(--laton)}.neg{color:var(--felpa)}
++.suave{color:var(--aluminio)}.pequeno{font-size:13px}.chico{font-size:12px}.angosto{}
++.pos{color:var(--naranja)}.neg{color:var(--fragil)}
+ .oculto{display:none!important}
+ button{font-family:inherit}
+-:focus-visible{outline:2px solid var(--laton);outline-offset:2px}
++:focus-visible{outline:2px solid var(--naranja);outline-offset:2px}
+ .pulsar{transition:transform var(--t-press) var(--ease-out)}.pulsar:active{transform:scale(0.97)}
+ @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+ 
+ .cab .envol{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:12px 32px;padding-top:24px;padding-bottom:8px}
+ .cab .izq{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 24px}
+-.marca{font-size:20px;font-weight:650;font-stretch:112%;color:var(--hueso);text-decoration:none}
++.marca{font-size:26px;color:var(--cinta);text-decoration:none}
+ .cab nav{display:flex;flex-wrap:wrap;gap:4px 20px;font-size:15px}
+-.cab nav a{color:var(--polvo);text-decoration:none;padding:8px 0}
+-.cab nav a:hover,.cab nav a[aria-current="page"]{color:var(--hueso)}.cab nav a[aria-current="page"]{font-weight:600}
+-.cab .meta{font-size:13px;color:var(--polvo)}
++.cab nav a{color:var(--aluminio);text-decoration:none;padding:8px 0}
++.cab nav a:hover,.cab nav a[aria-current="page"]{color:var(--cinta)}.cab nav a[aria-current="page"]{font-weight:600}
++.cab .meta{font-size:13px;color:var(--aluminio)}
+ main.envol{padding-top:24px;padding-bottom:48px;display:flex;flex-direction:column;gap:32px}
+ 
+ .pregunta{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px 32px}
+-.pregunta p{margin:6px 0 0;color:var(--polvo);max-width:70ch}
++.pregunta p{margin:6px 0 0;color:var(--aluminio);max-width:70ch}
+ .selector{display:flex;align-items:center;gap:12px}
+-.selector>span{font-size:13px;color:var(--polvo)}
+-.segmentos{display:flex;background:var(--forro);border-radius:var(--r);padding:3px;gap:2px}
+-.segmentos button{border:0;border-radius:4px;padding:8px 14px;min-height:40px;min-width:56px;font-size:14px;font-weight:600;cursor:pointer;background:transparent;color:var(--polvo)}
+-.segmentos button[aria-pressed="true"]{background:var(--hueso);color:var(--tolex)}
++.selector>span{font-size:13px;color:var(--aluminio)}
++.segmentos{display:flex;border:1.5px solid var(--aluminio)}
++.segmentos button{border:0;border-radius:4px;padding:8px 14px;min-height:40px;min-width:56px;font-size:14px;font-weight:600;cursor:pointer;background:transparent;color:var(--aluminio)}
++.segmentos button[aria-pressed="true"]{background:var(--naranja);color:var(--tinta)}
+ 
+ /* Una cifra por escenario de comisión; solo se ve la elegida */
+ {% for k in comisiones %}html[data-com="{{ k }}"] .esc:not([data-c="{{ k }}"]){display:none!important}
+@@ -48,101 +50,147 @@ html[data-com="{{ k }}"] .ord{order:var(--o{{ k }})}
+ {% endfor %}
+ 
+ .dinero{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.25}
+-.dinero .usd{font-size:12px;color:var(--polvo);font-weight:400}
++.dinero .usd{font-size:12px;color:var(--aluminio);font-weight:400}
+ 
+ .chips{display:flex;flex-wrap:wrap;gap:6px}
+-.chip{display:inline-block;font-size:12px;border-radius:999px;padding:2px 10px;white-space:nowrap;background:var(--tolex);color:var(--hueso);border:1px solid var(--forro)}
+-.chip.reventa,.chip.ganga{background:var(--laton);color:var(--tolex);border-color:var(--laton);font-weight:600}
+-.chip.posible,.chip.bajo{border-color:var(--laton);color:var(--laton)}
+-.chip.estimada,.chip.revisar{border-color:var(--polvo);color:var(--hueso)}
+-.chip.encima,.chip.sinmargen{color:var(--felpa);border-color:var(--forro)}
+-.chip.interes{border-color:var(--hueso);color:var(--hueso);font-weight:600}
+-.seguida{display:grid;grid-template-columns:minmax(0,2fr) minmax(120px,1fr) minmax(150px,1fr) auto;gap:16px;align-items:center;padding:16px 20px;border-top:1px solid var(--tolex)}
++.chip{display:inline-block;font-size:12px;border-radius:2px;padding:2px 10px;white-space:nowrap;background:var(--estuche);color:var(--cinta);border:1px solid var(--laminado)}
++.chip.reventa,.chip.ganga{background:var(--naranja);color:var(--tinta);border-color:var(--naranja);font-weight:600}
++.chip.posible,.chip.bajo{border-color:var(--naranja);color:var(--naranja)}
++.chip.estimada,.chip.revisar{border-color:var(--aluminio);color:var(--cinta)}
++.chip.encima,.chip.sinmargen{color:var(--fragil);border-color:var(--laminado)}
++.chip.interes{border-color:var(--cinta);color:var(--cinta);font-weight:600}
++.seguida{display:grid;grid-template-columns:minmax(0,2fr) minmax(120px,1fr) minmax(150px,1fr) auto;gap:16px;align-items:center;padding:16px 20px;border-top:1px solid var(--estuche)}
+ .seguida:first-child{border-top:0}
+ .seguida .nom{display:flex;flex-direction:column;gap:4px;min-width:0}
+ .seguida .nom b{font-size:16px}
+ .historial{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:14px}
+-.historial li{display:flex;gap:12px}.historial time{color:var(--polvo);min-width:7em}
++.historial li{display:flex;gap:12px}.historial time{color:var(--aluminio);min-width:7em}
+ 
+-.foto{position:relative;overflow:hidden;background:var(--tolex);border-radius:var(--r);display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:var(--polvo);font-size:14px}
+-.foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;outline:1px solid rgba(236,231,222,.1);outline-offset:-1px}
++.foto{position:relative;overflow:hidden;background:var(--estuche);border:1px solid var(--aluminio);display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:var(--aluminio);font-size:14px}
++.foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+ 
+-.boton{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:var(--r);border:0;background:var(--tolex);color:var(--hueso);font-size:15px;text-decoration:none;cursor:pointer}
+-.boton:hover{background:#17181B;color:var(--hueso)}
+-.boton.prim{background:var(--laton);color:var(--tolex);font-weight:600}.boton.prim:hover{background:#DDBB70}
++.boton{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:0;border:1px solid var(--aluminio);background:transparent;color:var(--cinta);font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;transition:background-color var(--t-estado) var(--ease-out)}
++.boton:hover{background:var(--laminado2);color:var(--cinta)}
++.boton.prim{background:var(--naranja);border-color:var(--naranja);color:var(--tinta);font-weight:700}.boton.prim:hover{background:#FF8240}
++.boton:disabled{opacity:.5;cursor:not-allowed}
+ .botones{display:flex;flex-wrap:wrap;gap:10px}
+ 
+ /* Estuche: el detalle de una publicación */
+-.estuche{background:var(--forro);border-radius:var(--r2);padding:28px;display:flex;flex-direction:column;gap:24px;min-width:0}
++.estuche{position:relative;background:var(--laminado);border:1px solid var(--aluminio);padding:28px;display:flex;flex-direction:column;gap:24px;min-width:0}
++.estuche:before,.estuche:after{content:"";position:absolute;top:-1px;width:20px;height:20px;border:1px solid var(--aluminio);background:var(--laminado2)}
++.estuche:before{left:-1px;border-radius:0 0 8px 0}.estuche:after{right:-1px;border-radius:0 0 0 8px}
+ .estuche .cabeza{display:flex;flex-wrap:wrap;gap:24px}
+ .estuche .foto{flex:0 0 240px;height:180px}
+ .estuche .datos{flex:1 1 280px;display:flex;flex-direction:column;gap:14px;min-width:0}
+ .tres{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+ .cifra{display:flex;flex-direction:column;gap:2px;min-width:0}
+-.cifra .k{font-size:12px;color:var(--polvo)}
+-.cifra .v{font-size:22px;font-weight:650}
+-.cifra .s{font-size:12px;color:var(--polvo)}
+-.cascada{display:grid;grid-template-columns:minmax(150px,200px) minmax(0,1fr) 84px 120px;grid-auto-flow:row dense;gap:10px 16px;align-items:center;font-stretch:88%}
++.cifra .k{font-size:12px;color:var(--aluminio)}
++.cifra .v{font-size:22px;font-weight:700}
++.cifra .s{font-size:12px;color:var(--aluminio)}
++.cascada{display:grid;grid-template-columns:minmax(150px,200px) minmax(0,1fr) 84px 120px;grid-auto-flow:row dense;gap:10px 16px;align-items:center}
+ .cascada .et{grid-column:1}.cascada .barra{grid-column:2}.cascada .u{grid-column:3}.cascada .c{grid-column:4}
+-.cascada .tit{font-size:12px;color:var(--polvo);text-align:right}
++.cascada .tit{font-size:12px;color:var(--aluminio);text-align:right}
+ .cascada .et{font-size:14px}
+-.cascada .barra{position:relative;height:16px;background:var(--tolex);border-radius:2px}
+-.cascada .barra i{position:absolute;top:0;height:100%;border-radius:2px;background:var(--polvo)}
+-.cascada .barra i.comision,.cascada .barra i.perdida{background:var(--felpa)}.cascada .barra i.ganancia{background:var(--laton)}
+-.cascada .u{text-align:right;font-size:13px;color:var(--polvo)}.cascada .c{text-align:right;font-size:14px}
+-.cascada .fuerte{font-weight:650}
++.cascada .barra{position:relative;height:16px;background:var(--estuche);border-radius:2px}
++.cascada .barra i{position:absolute;top:0;height:100%;border-radius:2px;background:var(--aluminio)}
++.cascada .barra i.comision,.cascada .barra i.perdida{background:var(--fragil)}.cascada .barra i.ganancia{background:var(--naranja)}
++.cascada .u{text-align:right;font-size:13px;color:var(--aluminio)}.cascada .c{text-align:right;font-size:14px}
++.cascada .fuerte{font-weight:700}
+ .neto{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px}
+-.neto .grande{font-size:26px;font-weight:650}
+-.nota{margin:0;font-size:13px;color:var(--polvo);max-width:72ch}
+-.aviso{margin:0;font-size:14px;color:var(--hueso);background:var(--tolex);border-radius:var(--r);padding:10px 14px}
++.neto .grande{font-size:26px;font-weight:700}
++.nota{margin:0;font-size:13px;color:var(--aluminio);max-width:72ch}
++.aviso{margin:0;font-size:14px;color:var(--cinta);background:var(--estuche);border-radius:var(--r);padding:10px 14px}
++
++/* Guía de embarque: la cuenta por tramos (ver DESIGN.md) */
++.guia{background:var(--cinta);color:var(--tinta);border:2px solid var(--tinta);overflow:hidden}
++.guia-cab{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:8px 12px 0;font-size:11px;font-weight:700;color:var(--tinta2)}
++.guia-num{font-family:"IBM Plex Mono",monospace;font-weight:400;color:var(--tinta)}
++.ruta{display:grid;grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr) auto;align-items:center;gap:8px;padding:12px 12px 10px}
++.ruta .sten{font-size:40px;line-height:1}
++.ruta i{display:block;border-top:3px dashed var(--tinta)}
++.ruta .escala{font-size:11px;font-weight:700;text-align:center;line-height:1.2}
++.guia-fila{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1.3fr) 110px 130px;gap:10px;padding:7px 12px;border-top:1px solid var(--raya);font-size:15px;align-items:baseline}
++.guia-fila .n{text-align:right;white-space:nowrap}
++.guia-fila .base{font-size:12px;color:var(--tinta2)}
++.guia-fila .con small{display:none}
++.guia-tit{font-size:11px;font-weight:700;color:var(--tinta2);border-top:0;padding-top:0}
++.tramo{border-top:2px solid var(--tinta)}
++.tramo-cab{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:8px 12px 4px}
++.tramo-cab .sten{font-size:20px}
++.tramo-cab .paga{font-size:11px;font-weight:700;color:var(--tinta2)}
++.tramo[data-paga="usd"] .guia-fila .usd,.tramo[data-paga="cop"] .guia-fila .cop{font-weight:700}
++.tramo[data-paga="usd"] .guia-fila .cop,.tramo[data-paga="cop"] .guia-fila .usd{color:var(--tinta2)}
++.guia-fila.sub{border-top:1.5px dashed var(--tinta);font-weight:700}
++.tramo .guia-fila.sub .n{color:var(--tinta);font-weight:700}
++.guia-fila.total{border-top:2px solid var(--tinta);background:var(--total);font-weight:700}
++.tramo.venta{margin-top:12px}
++.guia-fila.neto{background:var(--tinta);color:var(--cinta);border-top:2px solid var(--tinta);padding:10px 12px;font-weight:700}
++.guia-fila.neto .base{color:var(--aluminio)}
++.tramo .guia-fila.neto .usd{color:var(--cinta)}
++.guia-fila.neto .cop{font-size:18px;font-weight:800;color:var(--naranja)}.guia-fila.neto .cop.neg{color:var(--fragil)}
++.gaffer{display:inline-block;align-self:flex-start;background:var(--cinta);color:var(--tinta);padding:6px 14px 5px;font-size:22px;line-height:1.1;clip-path:polygon(0 4%,3% 0,97% 6%,100% 0,99% 96%,96% 100%,4% 94%,0 100%)}
++.modelo{font-size:34px;line-height:1}
+ 
+ /* Hoy: lista y estuche */
+ .mesa{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+ .lista{flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:2px}
+-.lista .cols{display:flex;justify-content:space-between;font-size:12px;color:var(--polvo);padding:0 16px 8px}
+-.item{display:flex;justify-content:space-between;align-items:center;gap:16px;border-radius:var(--r);padding:14px 16px;min-height:64px;color:inherit;text-decoration:none;transition:background-color var(--t-estado) var(--ease-out)}
+-.item:hover{background:var(--forro2);color:inherit}.item[aria-current="true"]{background:var(--forro)}
++.lista .cols{display:flex;justify-content:space-between;font-size:12px;color:var(--aluminio);padding:8px 12px}
++.lista{border:1px solid var(--aluminio)}
++.item{display:grid;grid-template-columns:56px minmax(0,1fr) auto;align-items:center;gap:14px;padding:10px 12px;min-height:76px;border-top:1px solid var(--laminado2);color:inherit;text-decoration:none;transition:background-color var(--t-estado) var(--ease-out)}
++.mini{width:56px;height:56px;border:1px solid var(--aluminio);background:var(--estuche);overflow:hidden}.mini img{display:block;width:100%;height:100%;object-fit:cover}
++.item:hover{background:var(--laminado2);color:inherit}.item[aria-current="true"]{background:var(--laminado)}
+ .item .nom{display:flex;flex-direction:column;gap:3px;min-width:0}
+-.item .nom b{font-size:16px;font-weight:600}
+-.item .nom span{font-size:13px;color:var(--polvo);font-stretch:88%}
+-.item .monto{font-size:17px;font-weight:650}
++.item .nom b{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
++.item .nom span{font-size:13px;color:var(--aluminio)}
++.item .monto{font-size:17px;font-weight:700}
+ .panel{flex:999 1 560px;min-width:0;position:sticky;top:16px}
+ .panel .cerrar{display:none}
+ 
+ /* Tablas */
+-.caja{background:var(--forro);border-radius:var(--r2)}
++.caja{background:var(--laminado);border:1px solid var(--aluminio)}
+ .tabla{overflow-x:auto}
+ table{width:100%;border-collapse:collapse;font-size:14px}
+ .tabla table{min-width:1120px}
+-th{padding:12px;text-align:left;font-size:12px;font-weight:500;color:var(--polvo);white-space:nowrap}
+-td{padding:12px;border-top:1px solid var(--tolex);vertical-align:top}
++th{padding:12px;text-align:left;font-size:12px;font-weight:500;color:var(--aluminio);white-space:nowrap}
++td{padding:12px;border-top:1px solid var(--estuche);vertical-align:top}
+ td.n,th.n{text-align:right}
+-td small,th small{display:block;font-size:12px;color:var(--polvo);font-weight:400}
+-td .t{color:var(--hueso);font-weight:600;text-decoration:none}td .t:hover{color:var(--laton)}
++td small,th small{display:block;font-size:12px;color:var(--aluminio);font-weight:400}
++td .t{color:var(--cinta);font-weight:600;text-decoration:none}td .t:hover{color:var(--naranja)}
+ th button{min-height:0;padding:0;border:0;color:inherit;font-size:12px;font-weight:500;background:none;cursor:pointer}
+-th button:hover{color:var(--hueso)}
++th button:hover{color:var(--cinta)}
+ 
+ .filtros{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+-label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--polvo)}
+-input,select{font:inherit;font-size:16px;color:var(--hueso);background:var(--tolex);border:1px solid var(--forro);border-radius:var(--r);padding:10px 12px;min-height:44px}
+-.forro input,.forro select,.estuche input{background:var(--tolex);border-color:var(--tolex)}
+-.vacio{background:var(--forro);border-radius:var(--r2);padding:24px;color:var(--polvo)}
++label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--aluminio)}
++input,select{font:inherit;font-size:16px;color:var(--cinta);background:var(--estuche);border:1px solid var(--laminado);border-radius:var(--r);padding:10px 12px;min-height:44px}
++.forro input,.forro select,.estuche input{background:var(--estuche);border-color:var(--estuche)}
++.vacio{border:1px dashed var(--aluminio);padding:24px;color:var(--aluminio)}
+ .seccion{display:flex;flex-direction:column;gap:14px}
+ .seccion-cab{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px 16px}
+ .rejilla{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px}
+ .pares{display:flex;flex-direction:column;gap:8px}
+ .par{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+-.par>span:first-child{font-size:14px;color:var(--polvo)}.par>span:last-child{text-align:right}
+-pre{white-space:pre-wrap;background:var(--tolex);padding:12px;border-radius:var(--r);font-size:13px;color:var(--polvo);max-height:420px;overflow:auto}
+-details summary{cursor:pointer;color:var(--polvo)}
+-.progreso{height:8px;background:var(--tolex);border-radius:4px;overflow:hidden;max-width:420px}.progreso i{display:block;height:100%;background:var(--laton)}
+-.pie{border-top:1px solid var(--forro);padding-top:16px;padding-bottom:32px;font-size:12px;color:var(--polvo)}
++.par>span:first-child{font-size:14px;color:var(--aluminio)}.par>span:last-child{text-align:right}
++pre{white-space:pre-wrap;background:var(--estuche);padding:12px;border-radius:var(--r);font-size:13px;color:var(--aluminio);max-height:420px;overflow:auto}
++details summary{cursor:pointer;color:var(--aluminio)}
++.progreso{height:8px;background:var(--estuche);border-radius:4px;overflow:hidden;max-width:420px}.progreso i{display:block;height:100%;background:var(--naranja)}
++.pie{border-top:1px solid var(--laminado);padding-top:16px;padding-bottom:32px;font-size:12px;color:var(--aluminio)}
+ .pie p{margin:0 0 6px;max-width:110ch}
+ 
+ @media (max-width:900px){
+   .envol{padding:0 16px}
+-  h1{font-size:26px}
+-  .estuche{padding:20px}
++  .estuche{padding:16px}
++  .estuche .guia{margin:0 -16px;border-left:0;border-right:0}
++  .guia-fila{grid-template-columns:minmax(0,1fr) 96px 88px;gap:8px;padding:7px 12px;font-size:14px}
++  .tramo-cab .sten{font-size:18px}.tramo-cab .paga{white-space:nowrap}
++  .guia-fila .base{display:none}
++  .guia-fila .con small{display:block;font-size:11px;font-weight:400;color:var(--tinta2)}
++  .guia-fila.neto{grid-template-columns:minmax(0,1fr) auto}
++  .guia-fila.neto .cop{grid-row:1;grid-column:2}
++  .guia-fila.neto .usd{grid-row:2;grid-column:1 / -1;font-size:12px;font-weight:400;color:var(--aluminio)}
++  .guia-fila.neto .con small{color:var(--aluminio)}
++  .ruta .sten{font-size:30px}
++  .modelo{font-size:28px}
++  h1{font-size:30px}
+   .tres{gap:10px}.cifra .v{font-size:18px}
+   .seguida{grid-template-columns:minmax(0,1fr) auto;padding:14px 16px}
+   .seguida .nom,.seguida .botones{grid-column:1 / -1}.seguida .botones{justify-content:flex-start!important}.neto .grande{font-size:22px}
+@@ -156,18 +204,19 @@ details summary{cursor:pointer;color:var(--polvo)}
+   /* En el móvil, el estuche de Hoy se abre como hoja desde abajo */
+   .panel{position:fixed;top:auto;left:0;right:0;bottom:0;max-height:88vh;overflow-y:auto;z-index:20;transform:translateY(105%);visibility:hidden;transition:transform var(--t-hoja) var(--ease-drawer),visibility 0s linear var(--t-hoja);padding-bottom:env(safe-area-inset-bottom)}
+   .panel.abierto{transform:none;visibility:visible;transition:transform var(--t-hoja) var(--ease-drawer)}
+-  .panel .estuche{border-radius:16px 16px 0 0;box-shadow:0 -1px 0 rgba(0,0,0,.3),0 -12px 32px rgba(0,0,0,.45)}
++  .panel .estuche:before,.panel .estuche:after{display:none}
++  .panel .estuche{border-radius:16px 16px 0 0;border-bottom:0;box-shadow:0 -1px 0 rgba(0,0,0,.3),0 -12px 32px rgba(0,0,0,.45)}
+   .panel .cerrar{display:flex;position:sticky;top:12px;height:0;justify-content:flex-end;z-index:2;padding-right:12px}
+-  .panel .cerrar .boton{width:44px;padding:0;border-radius:22px;background:var(--tolex)}
++  .panel .cerrar .boton{width:44px;padding:0;border-radius:22px;background:var(--estuche)}
+   .velo{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:19;opacity:0;pointer-events:none;transition:opacity var(--t-hoja) var(--ease-out)}
+   .velo.abierto{opacity:1;pointer-events:auto}
+ }
+-.cascada .c .ux{display:none;color:var(--polvo);font-size:12px}
++.cascada .c .ux{display:none;color:var(--aluminio);font-size:12px}
+ </style>
+ </head><body>
+ <header class="cab"><div class="envol">
+ <div class="izq">
+-<a class="marca" href="{{ e('hoy') }}" data-con-com>Radar de instrumentos</a>
++<a class="marca sten" href="{{ e('hoy') }}" data-con-com>Radar · MIA → BOG</a>
+ <nav aria-label="Secciones">
+ <a href="{{ e('hoy') }}" data-con-com{% if activa == 'hoy' %} aria-current="page"{% endif %}>Hoy</a>
+ <a href="{{ e('explorar') }}" data-con-com{% if activa == 'explorar' %} aria-current="page"{% endif %}>Explorar</a>
+diff --git a/radar/web/templates/detalle.html b/radar/web/templates/detalle.html
+index 9f2fa40..2e85148 100644
+--- a/radar/web/templates/detalle.html
++++ b/radar/web/templates/detalle.html
+@@ -4,7 +4,7 @@
+ <div class="pregunta">
+ <a href="{{ e('hoy') }}" data-con-com class="pequeno">Volver a Hoy</a>
+ <div class="selector" role="group" aria-label="Comisión del vendedor en Colombia"><span>Comisión del vendedor</span>
+-<div class="segmentos">{% for k in comisiones %}<button type="button" class="pulsar" data-elegir-com="{{ k }}" aria-pressed="{{ 'true' if k == com_def else 'false' }}">{{ k }} %</button>{% endfor %}</div></div>
++<div class="segmentos">{% for k in comisiones %}<button type="button" class="pulsar" data-elegir-com="{{ k }}" aria-pressed="{{ 'true' if k == com_def else 'false' }}">{{ k }}&nbsp;%</button>{% endfor %}</div></div>
+ </div>
+ 
+ {{ m.estuche(o, e, completo=True, titulo_h="h1") }}
+@@ -52,7 +52,7 @@
+ {% endif %}
+ 
+ <div class="rejilla">
+-<section class="caja" style="padding:24px;display:flex;flex-direction:column;gap:12px"><div><h2>Mismo modelo en EE. UU.</h2><p class="suave pequeno" style="margin:6px 0 0">{% if o.valoracion_us %}{{ o.valoracion_us.n }} usadas · mediana ajustada {{ o.valoracion_us.mediana_usd|usd }} (−10 % por negociación) · nueva {{ o.valoracion_us.nuevo_usd|usd }}{% else %}Menos de 3 comparables{% endif %}</p></div>
++<section class="caja" style="padding:24px;display:flex;flex-direction:column;gap:12px"><div><h2>Mismo modelo en EE. UU.</h2><p class="suave pequeno" style="margin:6px 0 0">{% if o.valoracion_us %}{{ o.valoracion_us.n }} usadas · mediana ajustada {{ o.valoracion_us.mediana_usd|usd }} (−10&nbsp;% por negociación) · nueva {{ o.valoracion_us.nuevo_usd|usd }}{% else %}Menos de 3 comparables{% endif %}</p></div>
+ <table>{% for x in o.comps_us %}<tr><td>{% if x.url %}<a class="t" href="{{ x.url }}" target="_blank" rel="noopener">{{ x.titulo[:60] }}</a>{% else %}{{ x.titulo[:60] }}{% endif %}<small>{{ x.fuente|plataforma }} · {{ x.condicion }}</small></td><td class="n">{{ x.precio|usd }}<small>≈ {{ (x.precio * o.trm)|millones }}</small></td></tr>{% else %}<tr><td class="suave">Sin detalle guardado.</td></tr>{% endfor %}</table></section>
+ <section class="caja" style="padding:24px;display:flex;flex-direction:column;gap:12px"><div><h2>Colombia</h2><p class="suave pequeno" style="margin:6px 0 0">{% if o.comps_co %}{{ o.comps_co|length }} publicaciones del mismo modelo{% else %}No aparece en las tiendas consultadas{% endif %}</p></div>
+ {% if o.comps_co %}<table>{% for x in o.comps_co %}<tr><td>{% if x.url %}<a class="t" href="{{ x.url }}" target="_blank" rel="noopener">{{ x.titulo[:60] }}</a>{% else %}{{ x.titulo[:60] }}{% endif %}<small>{{ x.fuente }} · {{ x.condicion }}</small></td><td class="n">{{ x.precio|cop }}<small>{{ (x.precio / o.trm)|usd }}</small></td></tr>{% endfor %}</table>
+diff --git a/radar/web/templates/estado.html b/radar/web/templates/estado.html
+index ff376cf..06aec8d 100644
+--- a/radar/web/templates/estado.html
++++ b/radar/web/templates/estado.html
+@@ -43,7 +43,7 @@
+ <section class="seccion"><h2>Supuestos de las cuentas</h2>
+ <div class="caja" style="padding:24px;display:flex;flex-direction:column;gap:14px"><div class="pares" style="max-width:620px">
+ <div class="par"><span>Margen neto mínimo (después de comisión)</span><span>{{ p.margen_objetivo|pct }}</span></div>
+-<div class="par"><span>Comisión del vendedor para los veredictos · escenarios</span><span>{{ p.comision_canal|pct }} · {% for k in comisiones %}{{ k }} %{{ ', ' if not loop.last }}{% endfor %}</span></div>
++<div class="par"><span>Comisión del vendedor para los veredictos · escenarios</span><span>{{ p.comision_canal|pct }} · {% for k in comisiones %}{{ k }}&nbsp;%{{ ', ' if not loop.last }}{% endfor %}</span></div>
+ <div class="par"><span>Impuesto a las ventas en EE. UU. · recargo de la tarjeta</span><span>{{ p.sales_tax_us|pct }} · {{ p.margen_cambiario|pct1 }}</span></div>
+ <div class="par"><span>Flete del casillero (guitarra · bajo · pedal)</span><span>{{ p.flete_supuesto_usd.guitarra|usd }} · {{ p.flete_supuesto_usd.bajo|usd }} · {{ p.flete_supuesto_usd.pedal|usd }}</span></div>
+ <div class="par"><span>Seguro del envío · inspección en el casillero</span><span>{{ p.seguro_pct|pct1 }} (mínimo {{ p.seguro_min_usd|usd }}) · {{ p.inspeccion_usd|usd }}</span></div>
+diff --git a/radar/web/templates/explorar.html b/radar/web/templates/explorar.html
+index 52414c3..4b0cc36 100644
+--- a/radar/web/templates/explorar.html
++++ b/radar/web/templates/explorar.html
+@@ -4,7 +4,7 @@
+ <section class="pregunta">
+ <div><h1>Explorar</h1><p id="cuenta">{{ ops|length }} publicaciones</p></div>
+ <div class="selector" role="group" aria-label="Comisión del vendedor en Colombia"><span>Comisión del vendedor</span>
+-<div class="segmentos">{% for k in comisiones %}<button type="button" class="pulsar" data-elegir-com="{{ k }}" aria-pressed="{{ 'true' if k == com_def else 'false' }}">{{ k }} %</button>{% endfor %}</div></div>
++<div class="segmentos">{% for k in comisiones %}<button type="button" class="pulsar" data-elegir-com="{{ k }}" aria-pressed="{{ 'true' if k == com_def else 'false' }}">{{ k }}&nbsp;%</button>{% endfor %}</div></div>
+ </section>
+ <form class="filtros" id="filtros" onsubmit="return false">
+ <label>Buscar<input type="search" id="f-texto" placeholder="Modelo, color, año…"></label>
+diff --git a/radar/web/templates/hoy.html b/radar/web/templates/hoy.html
+index 5950f61..b5c8721 100644
+--- a/radar/web/templates/hoy.html
++++ b/radar/web/templates/hoy.html
+@@ -4,10 +4,10 @@
+ <section class="pregunta">
+ <div>
+ <h1>¿Qué ofertar hoy?</h1>
+-<p>{% for k in comisiones %}<span class="esc" data-c="{{ k }}">{{ resumen.margen_por_com.get(k, 0) }} de {{ destacadas|length }} llegan al {{ p.margen_objetivo|pct }} neto con comisión del {{ k }} % si negocias hasta el techo.</span>{% endfor %} La lista muestra el neto al precio pedido. {{ resumen.evaluadas }} publicaciones evaluadas{% if resumen.prioritarias %}, {{ resumen.prioritarias }} neck-thru{% endif %}.</p>
++<p>{% for k in comisiones %}<span class="esc" data-c="{{ k }}">{{ resumen.margen_por_com.get(k, 0) }} de {{ destacadas|length }} llegan al {{ p.margen_objetivo|pct }} neto con comisión del {{ k }}&nbsp;% si negocias hasta el techo.</span>{% endfor %} La lista muestra el neto al precio pedido. {{ resumen.evaluadas }} publicaciones evaluadas{% if resumen.prioritarias %}, {{ resumen.prioritarias }} neck-thru{% endif %}.</p>
+ </div>
+ <div class="selector" role="group" aria-label="Comisión del vendedor en Colombia"><span>Comisión del vendedor</span>
+-<div class="segmentos">{% for k in comisiones %}<button type="button" class="pulsar" data-elegir-com="{{ k }}" aria-pressed="{{ 'true' if k == com_def else 'false' }}">{{ k }} %</button>{% endfor %}</div></div>
++<div class="segmentos">{% for k in comisiones %}<button type="button" class="pulsar" data-elegir-com="{{ k }}" aria-pressed="{{ 'true' if k == com_def else 'false' }}">{{ k }}&nbsp;%</button>{% endfor %}</div></div>
+ </section>
+ 
+ {% if destacadas %}
+diff --git a/radar/web/templates/parametros.html b/radar/web/templates/parametros.html
+index b9535db..96f3c4b 100644
+--- a/radar/web/templates/parametros.html
++++ b/radar/web/templates/parametros.html
+@@ -1,5 +1,5 @@
+ {% extends "base.html" %}{% block cuerpo %}
+-<h1>Parámetros</h1><p class="suave">Las fracciones van en decimal: 0.25 es 25 %.</p>
++<h1>Parámetros</h1><p class="suave">Las fracciones van en decimal: 0.25 es 25&nbsp;%.</p>
+ <form method="post"><div class="rejilla">
+ {% for k in numericos %}<div><label>{{ k }}</label><input name="{{ k }}" value="{{ p[k] }}"></div>{% endfor %}
+ <div><label>trm_manual (respaldo)</label><input name="trm_manual" value="{{ p.trm_manual or '' }}"></div>
+diff --git a/tests/test_formato.py b/tests/test_formato.py
+new file mode 100644
+index 0000000..0e1c60b
+--- /dev/null
++++ b/tests/test_formato.py
+@@ -0,0 +1,12 @@
++"""Formatos es-CO: dólares con centavos, % con espacio duro y fechas legibles."""
++from radar.vistas import entorno, fecha_es, pct
++
++
++def test_formatos_es_co():
++    f = entorno().filters
++    assert f["usd2"](1650) == "US$1.650,00" and f["usd2"](-197.61) == "−US$197,61"
++    assert f["susd2"](1056.27) == "+US$1.056,27"
++    assert pct(0.25) == "25 %" and f["spct"](0.39) == "+39 %" and f["pct1"](0.035) == "3,5 %"
++    assert fecha_es("2026-11-20T06:54:00") == "20 nov 2026, 6:54 a. m."
++    assert fecha_es("2026-11-20T18:05") == "20 nov 2026, 6:05 p. m." and fecha_es("2026-11-20") == "20 nov 2026"
++    assert fecha_es(None) == "—"
+diff --git a/tests/test_guia.py b/tests/test_guia.py
+new file mode 100644
+index 0000000..bad0e17
+--- /dev/null
++++ b/tests/test_guia.py
+@@ -0,0 +1,64 @@
++"""Guía de embarque: los tramos del costo y la venta cuadran a la vista, en USD y COP."""
++from dataclasses import asdict
++
++from radar import costing, db
++from radar.vistas import guia, repartir
++
++P = dict(db.PARAMETROS_DEFECTO)
++
++
++def _caso(precio=1650.0, envio=0.0, cat="bajo", ref=13_149_000, trm=3327.0, com=0.05):
++    c = costing.cuenta(precio, envio, cat, trm, P)
++    d = {"costo_pedido": asdict(c), "trm": trm, "precio_co_cop": ref, "listing": {"envio_us_usd": envio}}
++    neto = costing.venta(ref, c, com, P).neto_cop
++    return guia(d, P, com, neto), c, neto
++
++
++def test_repartir_cuadra_con_el_total():
++    assert repartir([1.4, 1.4, 1.2], 1) == [2, 1, 1]
++    assert repartir([665_400, 192_134, 33_270, 101_469], 1000) == [665_000, 192_000, 33_000, 102_000]
++    assert repartir([190.775, 398.71975], 0.01) == [190.77, 398.72]
++
++
++def test_tramos_en_orden_y_con_su_base():
++    g, _, _ = _caso()
++    assert [t["titulo"] for t in g["tramos"]] == ["Compra en Miami", "Envío a Bogotá", "Aduana en Bogotá", "Puesta a punto"]
++    assert [t["moneda"] for t in g["tramos"]] == ["usd", "usd", "cop", "cop"]
++    conceptos = [l["concepto"] for t in g["tramos"] for l in t["lineas"]]
++    assert conceptos == ["Precio pedido", "Impuesto de ventas", "Flete del casillero", "Seguro", "Inspección",
++                         "Recargo de la tarjeta", "Arancel", "IVA", "Ajuste del luthier"]
++    linea = {l["concepto"]: l for t in g["tramos"] for l in t["lineas"]}
++    assert linea["Precio pedido"]["usd"] == 1650.0 and linea["Flete del casillero"]["usd"] == 200.0
++    assert linea["Seguro"]["usd"] == 57.75 and linea["Inspección"]["usd"] == 10.0
++    assert linea["Arancel"]["base"].startswith("10") and linea["IVA"]["base"].startswith("19")
++    assert g["n_venta"] == 5
++
++
++def test_todo_cuadra_a_la_vista():
++    g, c, neto = _caso()
++    for t in g["tramos"]:
++        assert t["subtotal"]["cop"] == sum(l["cop"] for l in t["lineas"])
++        assert abs(t["subtotal"]["usd"] - sum(l["usd"] for l in t["lineas"])) < 0.005
++    assert g["costo"]["cop"] == sum(t["subtotal"]["cop"] for t in g["tramos"]) == round(c.total_cop, -3)
++    assert abs(g["costo"]["usd"] - round(c.total_usd, 2)) < 0.005
++    v = g["venta"]
++    assert v["cierre"]["cop"] == 13_149_000 and v["neto"]["cop"] == round(neto, -3)
++    assert v["cierre"]["cop"] - v["comision"]["cop"] - g["costo"]["cop"] == v["neto"]["cop"]
++    assert abs(v["comision"]["cop"] - 13_149_000 * 0.05) <= 1000  # la comisión absorbe el redondeo
++    assert abs(v["margen"] - neto / c.total_cop) < 1e-9
++
++
++def test_pedal_sin_luthier_y_con_envio_en_eeuu():
++    g, _, _ = _caso(precio=120.0, envio=10.0, cat="pedal", ref=900_000, com=0.10)
++    assert [t["n"] for t in g["tramos"]] == [1, 2, 3] and g["n_venta"] == 4
++    assert g["tramos"][0]["lineas"][0]["concepto"] == "Precio pedido y envío en EE. UU."
++
++
++def test_sin_comision_la_fila_vale_cero():
++    g, _, _ = _caso(com=0.0)
++    assert g["venta"]["comision"]["cop"] == 0 and g["venta"]["comision_pct"] == 0.0
++
++
++def test_perdida_lleva_neto_negativo():
++    g, _, neto = _caso(ref=5_000_000)
++    assert neto < 0 and g["venta"]["neto"]["cop"] == round(neto, -3) and g["venta"]["margen"] < 0
+diff --git a/tests/test_web.py b/tests/test_web.py
+index 851a8c2..ba5babf 100644
+--- a/tests/test_web.py
++++ b/tests/test_web.py
+@@ -37,7 +37,11 @@ def test_hoy_muestra_lista_y_estuche_en_dos_monedas(cliente):
+     # una cifra por comisión, en pesos y dólares
+     for k in ("0", "5", "10"):
+         assert f'class="esc dinero" data-c="{k}"' in r.text and f'data-elegir-com="{k}"' in r.text
+-    assert "A dónde va cada peso de la venta" in r.text and ">USD<" in r.text and ">COP<" in r.text and "US$" in r.text
++    assert "De dónde sale el neto" in r.text and ">USD<" in r.text and ">COP<" in r.text and "US$" in r.text
++    # la guía de embarque: tramos en orden, costo puesto y neto
++    assert 'class="guia"' in r.text and "Costo puesto en Bogotá" in r.text and 'class="guia-fila neto"' in r.text
++    assert r.text.index("Compra en Miami") < r.text.index("Envío a Bogotá") < r.text.index("Aduana en Bogotá")
++    assert r.text.count('class="mini"') == 2
+ 
+ 
+ def test_explorar_trae_todo_para_filtrar(cliente):
+@@ -171,3 +175,10 @@ def test_tablero_importa_capturas_del_repo_al_abrir(tmp_path, monkeypatch):
+     x = c.get("/explorar").text
+     assert "Guitarras (5)" in x
+     assert "A precio de mercado" in x and "Neck-thru" in x and "capturas importadas" in c.get("/corrida").text
++
++
++def test_paleta_road_case(cliente):
++    c, _ = cliente
++    t = c.get("/").text
++    assert "Big+Shoulders+Stencil" in t and "Schibsted+Grotesk" in t and "Archivo" not in t
++    assert "--naranja:#FF6B1A" in t and "--tolex" not in t and "Radar · MIA → BOG" in t
