@@ -1,7 +1,7 @@
 {
 "fuente": "reverb",
 "consulta": "jackson pro series soloist",
-"capturado": "2026-11-20",
+"capturado": "2026-11-21",
 "categoria": "guitarra",
 "nota": "Usadas de vendedores en EE. UU. que envían, hasta USD 3500. 0 omitidas por no ser el instrumento completo o no identificarse el modelo.",
 "publicaciones": [
@@ -160,34 +160,6 @@
 "foto": "https://rvb-img.reverb.com/i/s--u626QoFT--/quality=medium-low,height=800,width=800,fit=contain/iepwm5zkgaqe1osuxhoi.jpg"
 },
 {
-"id": "101726607",
-"titulo": "Jackson Pro Series Josh Smith Signature Soloist SL7 - Aquamarine",
-"url": "https://reverb.com/item/101726607",
-"precio_usd": 2400.0,
-"envio_usd": 0.0,
-"marca": "Jackson",
-"modelo": "Pro Josh Smith Soloist SL7",
-"categoria": "guitarra",
-"estado": "excellent",
-"ofertas": false,
-"publicada": "2026-09-11",
-"foto": "https://rvb-img.reverb.com/i/s--Ca34na02--/quality=medium-low,height=800,width=800,fit=contain/543a649a-0f35-4c98-a653-2d9540896e84.jpeg"
-},
-{
-"id": "103159333",
-"titulo": "Jackson Pro Plus Series Signature Chris Broderick Soloist 7 Transparent Black",
-"url": "https://reverb.com/item/103159333",
-"precio_usd": 1540.0,
-"envio_usd": 49.95,
-"marca": "Jackson",
-"modelo": "Pro Plus Chris Broderick Soloist 7",
-"categoria": "guitarra",
-"estado": "mint-inventory",
-"ofertas": false,
-"publicada": "2026-10-21",
-"foto": "https://rvb-img.reverb.com/i/s--mxsGEIKH--/quality=medium-low,height=800,width=800,fit=contain/92f8e9ff-9400-4b0b-85ee-3285c433164e.jpg"
-},
-{
 "id": "103251473",
 "titulo": "Used Jackson Pro Plus Series Soloist SLA2 Ebony - Gloss Black",
 "url": "https://reverb.com/item/103251473",
@@ -202,32 +174,18 @@
 "foto": "https://rvb-img.reverb.com/i/s--2pTCIhPZ--/quality=medium-low,height=800,width=800,fit=contain/6fac0884-3710-404a-bdb2-a4b57aab088c.png"
 },
 {
-"id": "95341631",
-"titulo": "Used Jackson Pro Plus Series Soloist SLA2 HT Electric Guitar - Toxic Apple",
-"url": "https://reverb.com/item/95341631",
-"precio_usd": 1119.99,
-"envio_usd": 0.0,
+"id": "104072653",
+"titulo": "Jackson Pro Series SL2Q MAH Soloist - 2016 - Burnt Cherry Sunburst",
+"url": "https://reverb.com/item/104072653",
+"precio_usd": 799.99,
+"envio_usd": 100.0,
 "marca": "Jackson",
-"modelo": "Pro Plus Soloist SLA2 HT",
+"modelo": "Pro Soloist SL2Q MAH",
 "categoria": "guitarra",
-"estado": "mint-inventory",
-"ofertas": false,
-"publicada": "2026-04-02",
-"foto": "https://rvb-img.reverb.com/i/s--eMq7P2ET--/quality=medium-low,height=800,width=800,fit=contain/20b95c2d-748e-4c94-b33b-a1629944c9db.png"
-},
-{
-"id": "103746570",
-"titulo": "Jackson Pro Series SL3R Soloist 2021 - Present - Mirror - Seymour Duncan Pickups – Hardshe",
-"url": "https://reverb.com/item/103746570",
-"precio_usd": 1100.0,
-"envio_usd": 0.0,
-"marca": "Jackson",
-"modelo": "Pro Soloist SL3R",
-"categoria": "guitarra",
-"estado": "excellent",
+"estado": "good",
 "ofertas": true,
-"publicada": "2026-11-04",
-"foto": "https://rvb-img.reverb.com/i/s--FpWMgrtP--/quality=medium-low,height=800,width=800,fit=contain/0aadb6aa-9156-4fcd-b5f8-e035a7ea9726.heic"
+"publicada": "2026-11-12",
+"foto": "https://rvb-img.reverb.com/i/s--4EVc_iNH--/quality=medium-low,height=800,width=800,fit=contain/c8ed47ba-e0bb-4074-8db8-6802ea648e04.jpg"
 },
 {
 "id": "86832175",
@@ -258,18 +216,18 @@
 "foto": "https://rvb-img.reverb.com/i/s--2GMlDdet--/quality=medium-low,height=800,width=800,fit=contain/4f33ec14-344b-417b-b036-9c5e904b0bf7.png"
 },
 {
-"id": "104072653",
-"titulo": "Jackson Pro Series SL2Q MAH Soloist - 2016 - Burnt Cherry Sunburst",
-"url": "https://reverb.com/item/104072653",
-"precio_usd": 799.99,
-"envio_usd": 100.0,
+"id": "103746570",
+"titulo": "Jackson Pro Series SL3R Soloist 2021 - Present - Mirror - Seymour Duncan Pickups – Hardshe",
+"url": "https://reverb.com/item/103746570",
+"precio_usd": 1100.0,
+"envio_usd": 0.0,
 "marca": "Jackson",
-"modelo": "Pro Soloist SL2Q MAH",
+"modelo": "Pro Soloist SL3R",
 "categoria": "guitarra",
-"estado": "good",
+"estado": "excellent",
 "ofertas": true,
-"publicada": "2026-11-12",
-"foto": "https://rvb-img.reverb.com/i/s--4EVc_iNH--/quality=medium-low,height=800,width=800,fit=contain/c8ed47ba-e0bb-4074-8db8-6802ea648e04.jpg"
+"publicada": "2026-11-04",
+"foto": "https://rvb-img.reverb.com/i/s--FpWMgrtP--/quality=medium-low,height=800,width=800,fit=contain/0aadb6aa-9156-4fcd-b5f8-e035a7ea9726.heic"
 },
 {
 "id": "104251546",
@@ -284,6 +242,62 @@
 "ofertas": true,
 "publicada": "2026-11-17",
 "foto": "https://rvb-img.reverb.com/i/s--6IAL6Px8--/quality=medium-low,height=800,width=800,fit=contain/07e8ff7c-e31c-4a9c-8e45-40ffb6176478.jpeg"
+},
+{
+"id": "95341631",
+"titulo": "Used Jackson Pro Plus Series Soloist SLA2 HT Electric Guitar - Toxic Apple",
+"url": "https://reverb.com/item/95341631",
+"precio_usd": 1119.99,
+"envio_usd": 0.0,
+"marca": "Jackson",
+"modelo": "Pro Plus Soloist SLA2 HT",
+"categoria": "guitarra",
+"estado": "mint-inventory",
+"ofertas": false,
+"publicada": "2026-04-02",
+"foto": "https://rvb-img.reverb.com/i/s--eMq7P2ET--/quality=medium-low,height=800,width=800,fit=contain/20b95c2d-748e-4c94-b33b-a1629944c9db.png"
+},
+{
+"id": "103159333",
+"titulo": "Jackson Pro Plus Series Signature Chris Broderick Soloist 7 Transparent Black",
+"url": "https://reverb.com/item/103159333",
+"precio_usd": 1540.0,
+"envio_usd": 49.95,
+"marca": "Jackson",
+"modelo": "Pro Plus Chris Broderick Soloist 7",
+"categoria": "guitarra",
+"estado": "mint-inventory",
+"ofertas": false,
+"publicada": "2026-10-21",
+"foto": "https://rvb-img.reverb.com/i/s--mxsGEIKH--/quality=medium-low,height=800,width=800,fit=contain/92f8e9ff-9400-4b0b-85ee-3285c433164e.jpg"
+},
+{
+"id": "101726607",
+"titulo": "Jackson Pro Series Josh Smith Signature Soloist SL7 - Aquamarine",
+"url": "https://reverb.com/item/101726607",
+"precio_usd": 2400.0,
+"envio_usd": 0.0,
+"marca": "Jackson",
+"modelo": "Pro Josh Smith Soloist SL7",
+"categoria": "guitarra",
+"estado": "excellent",
+"ofertas": false,
+"publicada": "2026-09-11",
+"foto": "https://rvb-img.reverb.com/i/s--Ca34na02--/quality=medium-low,height=800,width=800,fit=contain/543a649a-0f35-4c98-a653-2d9540896e84.jpeg"
+},
+{
+"id": "101095945",
+"titulo": "Jackson Pro Series Soloist SL2Q MAH - 2015 - 2016 - Burnt Cherry Sunburst",
+"url": "https://reverb.com/item/101095945",
+"precio_usd": 799.99,
+"envio_usd": 50.0,
+"marca": "Jackson",
+"modelo": "Pro Soloist SL2Q MAH",
+"categoria": "guitarra",
+"estado": "very-good",
+"ofertas": true,
+"publicada": "2026-08-27",
+"foto": "https://rvb-img.reverb.com/i/s--4zDVV_I5--/quality=medium-low,height=800,width=800,fit=contain/c3e38241-9695-48f0-88ae-df34e0e6c4d4.jpg"
 },
 {
 "id": "102932646",
@@ -314,18 +328,18 @@
 "foto": "https://rvb-img.reverb.com/i/s--gO9BQQS7--/quality=medium-low,height=800,width=800,fit=contain/cdf8e239-dbb0-4533-9739-c4899fe11601.jpg"
 },
 {
-"id": "101095945",
-"titulo": "Jackson Pro Series Soloist SL2Q MAH - 2015 - 2016 - Burnt Cherry Sunburst",
-"url": "https://reverb.com/item/101095945",
-"precio_usd": 799.99,
-"envio_usd": 50.0,
+"id": "95169836",
+"titulo": "Jackson Pro Plus Series Soloist SLA2 HT Electric Guitar Toxic Apple with Gig Bag",
+"url": "https://reverb.com/item/95169836",
+"precio_usd": 1399.99,
+"envio_usd": 0.0,
 "marca": "Jackson",
-"modelo": "Pro Soloist SL2Q MAH",
+"modelo": "Pro Plus Soloist SLA2 HT",
 "categoria": "guitarra",
-"estado": "very-good",
+"estado": "mint",
 "ofertas": true,
-"publicada": "2026-08-27",
-"foto": "https://rvb-img.reverb.com/i/s--4zDVV_I5--/quality=medium-low,height=800,width=800,fit=contain/c3e38241-9695-48f0-88ae-df34e0e6c4d4.jpg"
+"publicada": "2026-08-06",
+"foto": "https://rvb-img.reverb.com/i/s--1rBuza0b--/quality=medium-low,height=800,width=800,fit=contain/2f5b0a82-f0e8-4bdb-b9db-3ced39fc0208.jpg"
 },
 {
 "id": "103538099",
@@ -342,18 +356,18 @@
 "foto": "https://rvb-img.reverb.com/i/s--KSIWa6kP--/quality=medium-low,height=800,width=800,fit=contain/c35747aa-7b12-4d84-8b99-1b905f594dd4.jpeg"
 },
 {
-"id": "95169836",
-"titulo": "Jackson Pro Plus Series Soloist SLA2 HT Electric Guitar Toxic Apple with Gig Bag",
-"url": "https://reverb.com/item/95169836",
-"precio_usd": 1399.99,
-"envio_usd": 0.0,
+"id": "102839413",
+"titulo": "Jackson Pro Series SL2P HT MAH Soloist 2018 - 2019 - Carmel Burl",
+"url": "https://reverb.com/item/102839413",
+"precio_usd": 850.0,
+"envio_usd": 50.0,
 "marca": "Jackson",
-"modelo": "Pro Plus Soloist SLA2 HT",
+"modelo": "Pro Soloist SL2P HT MAH",
 "categoria": "guitarra",
-"estado": "mint",
-"ofertas": true,
-"publicada": "2026-08-06",
-"foto": "https://rvb-img.reverb.com/i/s--1rBuza0b--/quality=medium-low,height=800,width=800,fit=contain/2f5b0a82-f0e8-4bdb-b9db-3ced39fc0208.jpg"
+"estado": "very-good",
+"ofertas": false,
+"publicada": "2026-10-13",
+"foto": "https://rvb-img.reverb.com/i/s--7wSjB5Cl--/quality=medium-low,height=800,width=800,fit=contain/1eca3fe8-613d-4d30-a9d4-1fab203b6c5d.jpg"
 },
 {
 "id": "100102051",
@@ -370,20 +384,6 @@
 "foto": "https://rvb-img.reverb.com/i/s--EMF7Bgqr--/quality=medium-low,height=800,width=800,fit=contain/aa9e921e-145e-4151-b3bc-fa8961e07e15.png"
 },
 {
-"id": "102839413",
-"titulo": "Jackson Pro Series SL2P HT MAH Soloist 2018 - 2019 - Carmel Burl",
-"url": "https://reverb.com/item/102839413",
-"precio_usd": 850.0,
-"envio_usd": 50.0,
-"marca": "Jackson",
-"modelo": "Pro Soloist SL2P HT MAH",
-"categoria": "guitarra",
-"estado": "very-good",
-"ofertas": false,
-"publicada": "2026-10-13",
-"foto": "https://rvb-img.reverb.com/i/s--7wSjB5Cl--/quality=medium-low,height=800,width=800,fit=contain/1eca3fe8-613d-4d30-a9d4-1fab203b6c5d.jpg"
-},
-{
 "id": "92624806",
 "titulo": "⚠️ 1991 Jackson Pro Series SL-3 Soloist in Transparent Brown Sunburst over Quilted Maple! ",
 "url": "https://reverb.com/item/92624806",
@@ -394,22 +394,8 @@
 "categoria": "guitarra",
 "estado": "excellent",
 "ofertas": true,
-"publicada": "2025-10-14",
+"publicada": "2025-10-15",
 "foto": "https://rvb-img.reverb.com/i/s--pitiGU6Q--/quality=medium-low,height=800,width=800,fit=contain/seirr4zwh68iox5q9kz9.jpg"
-},
-{
-"id": "100489563",
-"titulo": "Mint Jackson Pro Series Signature Chris Broderick Soloist 7P Transparent Blue",
-"url": "https://reverb.com/item/100489563",
-"precio_usd": 1349.99,
-"envio_usd": 0.0,
-"marca": "Jackson",
-"modelo": "Pro Chris Broderick Soloist 7P",
-"categoria": "guitarra",
-"estado": "mint-inventory",
-"ofertas": false,
-"publicada": "2026-08-13",
-"foto": "https://rvb-img.reverb.com/i/s--kpO2B5p8--/quality=medium-low,height=800,width=800,fit=contain/r8isbfki09yqzxneh0sp.jpg"
 },
 {
 "id": "54202910",
@@ -426,18 +412,18 @@
 "foto": "https://rvb-img.reverb.com/i/s--fc24TDgZ--/quality=medium-low,height=800,width=800,fit=contain/dhc2owlmrowhh6xkggyu.jpg"
 },
 {
-"id": "73237240",
-"titulo": "Jackson Pro Series Chris Broderick Signature Soloist 7P Transparent Blue Used",
-"url": "https://reverb.com/item/73237240",
-"precio_usd": 900.0,
-"envio_usd": 125.0,
+"id": "100489563",
+"titulo": "Mint Jackson Pro Series Signature Chris Broderick Soloist 7P Transparent Blue",
+"url": "https://reverb.com/item/100489563",
+"precio_usd": 1349.99,
+"envio_usd": 0.0,
 "marca": "Jackson",
 "modelo": "Pro Chris Broderick Soloist 7P",
 "categoria": "guitarra",
-"estado": "excellent",
-"ofertas": true,
-"publicada": "2026-07-29",
-"foto": "https://rvb-img.reverb.com/i/s--puLGp41W--/quality=medium-low,height=800,width=800,fit=contain/upufhqclemqfs9usnybd.jpg"
+"estado": "mint-inventory",
+"ofertas": false,
+"publicada": "2026-08-13",
+"foto": "https://rvb-img.reverb.com/i/s--kpO2B5p8--/quality=medium-low,height=800,width=800,fit=contain/r8isbfki09yqzxneh0sp.jpg"
 },
 {
 "id": "87023476",
@@ -454,18 +440,18 @@
 "foto": "https://rvb-img.reverb.com/i/s--0qX6hjlX--/quality=medium-low,height=800,width=800,fit=contain/tcjdtnlpqvdsqaqebtnc.jpg"
 },
 {
-"id": "103323672",
-"titulo": "Jackson Pro Series Chris Broderick Signature Soloist HT6P 2022 - Transparent Blue",
-"url": "https://reverb.com/item/103323672",
-"precio_usd": 750.0,
-"envio_usd": 50.0,
+"id": "73237240",
+"titulo": "Jackson Pro Series Chris Broderick Signature Soloist 7P Transparent Blue Used",
+"url": "https://reverb.com/item/73237240",
+"precio_usd": 900.0,
+"envio_usd": 125.0,
 "marca": "Jackson",
-"modelo": "Pro Chris Broderick Soloist HT6P",
+"modelo": "Pro Chris Broderick Soloist 7P",
 "categoria": "guitarra",
 "estado": "excellent",
 "ofertas": true,
-"publicada": "2026-11-03",
-"foto": "https://rvb-img.reverb.com/i/s--NRpDXOhm--/quality=medium-low,height=800,width=800,fit=contain/58d84980-788e-4d34-8183-a57c367f9d8b.jpg"
+"publicada": "2026-07-29",
+"foto": "https://rvb-img.reverb.com/i/s--puLGp41W--/quality=medium-low,height=800,width=800,fit=contain/upufhqclemqfs9usnybd.jpg"
 },
 {
 "id": "54565695",
@@ -480,6 +466,20 @@
 "ofertas": false,
 "publicada": "2022-05-04",
 "foto": "https://rvb-img.reverb.com/i/s--o-gQMxmp--/quality=medium-low,height=800,width=800,fit=contain/cce7njktrq8useyfq1rp.jpg"
+},
+{
+"id": "103323672",
+"titulo": "Jackson Pro Series Chris Broderick Signature Soloist HT6P 2022 - Transparent Blue",
+"url": "https://reverb.com/item/103323672",
+"precio_usd": 750.0,
+"envio_usd": 50.0,
+"marca": "Jackson",
+"modelo": "Pro Chris Broderick Soloist HT6P",
+"categoria": "guitarra",
+"estado": "excellent",
+"ofertas": true,
+"publicada": "2026-11-03",
+"foto": "https://rvb-img.reverb.com/i/s--NRpDXOhm--/quality=medium-low,height=800,width=800,fit=contain/58d84980-788e-4d34-8183-a57c367f9d8b.jpg"
 },
 {
 "id": "73459738",
@@ -510,20 +510,6 @@
 "foto": "https://rvb-img.reverb.com/i/s--ifApzzEH--/quality=medium-low,height=800,width=800,fit=contain/a2b2e9c7-a2ec-4a8f-82ca-6287351141db.png"
 },
 {
-"id": "93696785",
-"titulo": "Used Jackson Pro Plus Series Sig Chris Broderick Soloist 6 - Transparent Black",
-"url": "https://reverb.com/item/93696785",
-"precio_usd": 1249.99,
-"envio_usd": 0.0,
-"marca": "Jackson",
-"modelo": "Pro Plus Chris Broderick Soloist 6",
-"categoria": "guitarra",
-"estado": "mint-inventory",
-"ofertas": false,
-"publicada": "2025-12-23",
-"foto": "https://rvb-img.reverb.com/i/s--yqR5RBJT--/quality=medium-low,height=800,width=800,fit=contain/40e58d8e-82e3-4c1c-904d-040e975e438c.png"
-},
-{
 "id": "84861518",
 "titulo": "Used Jackson Pro Series Signature Jeff Loomis Soloist SL7 HT - Black Ash",
 "url": "https://reverb.com/item/84861518",
@@ -536,6 +522,20 @@
 "ofertas": false,
 "publicada": "2024-09-27",
 "foto": "https://rvb-img.reverb.com/i/s--dKaZf7ov--/quality=medium-low,height=800,width=800,fit=contain/8b98d31f-c1df-446a-a350-2c3e9d36151d.jpg"
+},
+{
+"id": "93696785",
+"titulo": "Used Jackson Pro Plus Series Sig Chris Broderick Soloist 6 - Transparent Black",
+"url": "https://reverb.com/item/93696785",
+"precio_usd": 1249.99,
+"envio_usd": 0.0,
+"marca": "Jackson",
+"modelo": "Pro Plus Chris Broderick Soloist 6",
+"categoria": "guitarra",
+"estado": "mint-inventory",
+"ofertas": false,
+"publicada": "2025-12-23",
+"foto": "https://rvb-img.reverb.com/i/s--yqR5RBJT--/quality=medium-low,height=800,width=800,fit=contain/40e58d8e-82e3-4c1c-904d-040e975e438c.png"
 },
 {
 "id": "93696786",
@@ -608,18 +608,18 @@
 "foto": "https://rvb-img.reverb.com/i/s--ebtOIPw3--/quality=medium-low,height=800,width=800,fit=contain/3f719367-9fff-4ec6-bf9e-dbfdcc9c07b3.png"
 },
 {
-"id": "103251542",
-"titulo": "Used Jackson Pro Plus Series Soloist SLA2 HT Ebony - Toxic Apple",
-"url": "https://reverb.com/item/103251542",
-"precio_usd": 1119.0,
-"envio_usd": 0.0,
+"id": "99364371",
+"titulo": "Jackson Pro Series SL3M Soloist 2020 - Present - Rainbow Crackle",
+"url": "https://reverb.com/item/99364371",
+"precio_usd": 900.0,
+"envio_usd": 50.0,
 "marca": "Jackson",
-"modelo": "Pro Plus Soloist SLA2 HT",
+"modelo": "Pro Soloist SL3M",
 "categoria": "guitarra",
-"estado": "mint-inventory",
+"estado": "very-good",
 "ofertas": true,
-"publicada": "2026-10-23",
-"foto": "https://rvb-img.reverb.com/i/s--Da5KSMK0--/quality=medium-low,height=800,width=800,fit=contain/d70cdc64-6452-4650-8313-465fc6dfca82.png"
+"publicada": "2026-07-13",
+"foto": "https://rvb-img.reverb.com/i/s--ZgC7sexj--/quality=medium-low,height=800,width=800,fit=contain/ee682fc1-8f23-48ae-b9e1-3a731cdc5cea.heic"
 },
 {
 "id": "95416957",
@@ -636,18 +636,18 @@
 "foto": "https://rvb-img.reverb.com/i/s--j-n9Mrab--/quality=medium-low,height=800,width=800,fit=contain/60ef54f4-c190-4ca6-8f54-119d7fb89fef.png"
 },
 {
-"id": "99364371",
-"titulo": "Jackson Pro Series SL3M Soloist 2020 - Present - Rainbow Crackle",
-"url": "https://reverb.com/item/99364371",
-"precio_usd": 900.0,
-"envio_usd": 50.0,
+"id": "103251542",
+"titulo": "Used Jackson Pro Plus Series Soloist SLA2 HT Ebony - Toxic Apple",
+"url": "https://reverb.com/item/103251542",
+"precio_usd": 1119.0,
+"envio_usd": 0.0,
 "marca": "Jackson",
-"modelo": "Pro Soloist SL3M",
+"modelo": "Pro Plus Soloist SLA2 HT",
 "categoria": "guitarra",
-"estado": "very-good",
+"estado": "mint-inventory",
 "ofertas": true,
-"publicada": "2026-07-13",
-"foto": "https://rvb-img.reverb.com/i/s--ZgC7sexj--/quality=medium-low,height=800,width=800,fit=contain/ee682fc1-8f23-48ae-b9e1-3a731cdc5cea.heic"
+"publicada": "2026-10-23",
+"foto": "https://rvb-img.reverb.com/i/s--Da5KSMK0--/quality=medium-low,height=800,width=800,fit=contain/d70cdc64-6452-4650-8313-465fc6dfca82.png"
 },
 {
 "id": "104429977",
